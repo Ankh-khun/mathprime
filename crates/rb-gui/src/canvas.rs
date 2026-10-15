@@ -365,7 +365,13 @@ impl App {
 
     /// Naar de eerste regio met een fout: het kruisje erop en in beeld (vanuit de statusbalk).
     pub(crate) fn goto_first_error(&mut self) {
-        let Some(j) = (0..self.sheet.regions().len()).find(|&j| matches!(self.sheet.output(j), Output::Error { .. })) else { return };
+        if let Some(j) = (0..self.sheet.regions().len()).find(|&j| matches!(self.sheet.output(j), Output::Error { .. })) {
+            self.goto_region(j);
+        }
+    }
+
+    /// Naar regio `j`: geselecteerd, het kruisje erop en in beeld (fouten, zoeken).
+    pub(crate) fn goto_region(&mut self, j: usize) {
         self.commit(false);
         let items = self.items();
         if let Some(it) = items.get(j) {
@@ -394,7 +400,7 @@ impl App {
     }
 
     /// Pas de regio's aan, schrijf de bron opnieuw en reken door.
-    fn rewrite(&mut self, f: impl FnOnce(&mut Vec<Item>)) {
+    pub(crate) fn rewrite(&mut self, f: impl FnOnce(&mut Vec<Item>)) {
         let mut items = self.items();
         f(&mut items);
         let text = serialize(&mut items);

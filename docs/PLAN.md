@@ -24,7 +24,14 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.2)
+## 2. Wat er nu staat (v1.3)
+
+**Nieuw in v1.3.** Eén venster (`rb-gui/src/instance.rs`): het eerste venster luistert op 127.0.0.1 (poort en
+sleutel in `instance.txt`); een tweede start geeft het bestand door en stopt; bij het naar voren halen geeft het
+werkblad zijn toetsenbordfocus op, anders schuift egui het naar beneden. Automatisch bewaren (`recovery.rs`): elke
+minuut een kopie per gewijzigd tabblad in `herstel\`, netjes afsluiten leegt de map (behalve als de hersteldvraag
+nog open staat), na een crash de vraag herstellen of weggooien. Zoeken en vervangen (`find.rs`, Ctrl+F/Ctrl+H):
+hele namen via de tokens van de lexer; hernoemen alleen in de definitie en de regio's die ervan afhangen (graaf).
 
 **Nieuw in v1.2** (uiterlijk). Pictogrammen uit Tabler Icons (outline, MIT; `rb-gui/src/icons.rs`, lettertype als
 terugval achter de gewone lettertypen, zodat een pictogram ook in tekst kan staan). Lint zoals Mathcad Prime:

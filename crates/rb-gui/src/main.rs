@@ -9,6 +9,9 @@ mod keymap;
 mod library;
 mod paint;
 mod icons;
+mod instance;
+mod recovery;
+mod find;
 mod ribbon;
 mod settings;
 mod tabs;
@@ -16,6 +19,12 @@ mod shot;
 
 fn main() -> eframe::Result {
     let file = std::env::args().nth(1).map(std::path::PathBuf::from);
+    // al een venster open? Dan krijgt dat het bestand, en stopt deze start
+    let inbox = match instance::start(file.as_deref()) {
+        instance::Start::Handed => return Ok(()),
+        instance::Start::Primary(inbox) => Some(inbox),
+        instance::Start::Alone => None,
+    };
     let options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1300.0, 850.0])
@@ -28,5 +37,7 @@ fn main() -> eframe::Result {
             })),
         ..Default::default()
     };
-    eframe::run_native("MathPrime", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, file)))))
+    let result = eframe::run_native("MathPrime", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, file, inbox)))));
+    instance::stop();
+    result
 }

@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.2 — een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.3 — één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -98,6 +98,14 @@ plek op het blad (`@kolom,rij`). De menutoetsen staan in `keymap.txt` en de inst
 `instellingen.txt` (Windows: `%APPDATA%\MathPrime`). Die stel je in via Bestand → Instellingen…
 (Ctrl+,): thema (licht, donker of zoals Windows), achtergrond, leeg blad of welkomstblad bij het
 starten, zoom, het aantal significante cijfers in uitkomsten en automatisch aanvullen.
+
+MathPrime opent maar één venster: dubbelklik je in de Verkenner op een `.rkn` terwijl MathPrime al
+open is, dan komt het bestand als tabblad in dat venster. Elke minuut bewaart MathPrime een kopie
+van bladen met niet-opgeslagen wijzigingen (`%APPDATA%\MathPrime\herstel`); na een crash vraagt het
+bij de volgende start of die terug moeten. **Ctrl+F** zoekt in het blad (Enter: volgende treffer),
+**Ctrl+H** vervangt; met "Hele namen" hernoem je een variabele overal waar hij gebruikt wordt, maar
+niet in stukjes van andere namen of waar dezelfde letters een eenheid zijn (de `L` van liter boven
+de definitie van een variabele `L`).
 
 Meerdere werkbladen staan in tabbladen onder het lint, zoals in Prime. Openen (of een bestand naar
 het venster slepen) opent een nieuw tabblad; is het huidige blad nog leeg, dan komt het daar. Een

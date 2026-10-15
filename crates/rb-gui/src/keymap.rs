@@ -26,10 +26,12 @@ pub enum Action {
     Help,
     Welkomstblad,
     Instellingen,
+    Zoeken,
+    Vervangen,
 }
 
 impl Action {
-    pub const ALL: [Action; 15] = [
+    pub const ALL: [Action; 17] = [
         Action::Nieuw,
         Action::Openen,
         Action::Opslaan,
@@ -45,6 +47,8 @@ impl Action {
         Action::Help,
         Action::Welkomstblad,
         Action::Instellingen,
+        Action::Zoeken,
+        Action::Vervangen,
     ];
 
     /// Naam in het configuratiebestand.
@@ -65,6 +69,8 @@ impl Action {
             Action::Help => "help",
             Action::Welkomstblad => "welkomstblad",
             Action::Instellingen => "instellingen",
+            Action::Zoeken => "zoeken",
+            Action::Vervangen => "vervangen",
         }
     }
 
@@ -86,6 +92,8 @@ impl Action {
             Action::Help => "Syntax en hulp",
             Action::Welkomstblad => "Welkomstblad (voorbeeld)",
             Action::Instellingen => "Instellingen…",
+            Action::Zoeken => "Zoeken…",
+            Action::Vervangen => "Vervangen of hernoemen…",
         }
     }
 
@@ -106,6 +114,8 @@ impl Action {
             Action::Help => "F1",
             Action::Welkomstblad => "Ctrl+Shift+F1",
             Action::Instellingen => "Ctrl+Comma",
+            Action::Zoeken => "Ctrl+F",
+            Action::Vervangen => "Ctrl+H",
         }
     }
 }

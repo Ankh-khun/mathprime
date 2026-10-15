@@ -59,6 +59,13 @@ pub struct App {
     pub(crate) next_id: u64,
     /// Recent geopende bestanden (nieuwste eerst), voor het lege blad; zie settings.rs.
     pub(crate) recent: Vec<PathBuf>,
+    /// Bestanden van latere starts (een dubbelklik in de Verkenner); zie instance.rs.
+    inbox: Option<crate::instance::Inbox>,
+    /// Kopieën van een vorige keer (na een crash), nog niet beantwoord; zie recovery.rs.
+    pub(crate) recovery: Option<Vec<crate::recovery::Found>>,
+    /// De zoekbalk (Ctrl+F); zie find.rs.
+    pub(crate) find: Option<crate::find::FindState>,
+    pub(crate) last_autosave: Instant,
     /// Schermafdruk voor tests (MATHPRIME_SCREENSHOT).
     shot: Option<crate::shot::Shot>,
 }
@@ -68,7 +75,7 @@ fn editor_id() -> egui::Id {
 }
 
 impl App {
-    pub fn new(cc: &eframe::CreationContext<'_>, file: Option<PathBuf>) -> App {
+    pub fn new(cc: &eframe::CreationContext<'_>, file: Option<PathBuf>, inbox: Option<crate::instance::Inbox>) -> App {
         setup_fonts(&cc.egui_ctx);
         cc.egui_ctx.set_theme(egui::Theme::Light);
         let mut app = App {
@@ -101,10 +108,18 @@ impl App {
             doc_id: 0,
             next_id: 0,
             recent: Vec::new(),
+            inbox,
+            recovery: None,
+            find: None,
+            last_autosave: Instant::now(),
             shot: crate::shot::Shot::from_env(),
         };
         app.load_settings();
         app.load_recent();
+        app.check_recovery();
+        if let Some(i) = &app.inbox {
+            i.set_ctx(&cc.egui_ctx);
+        }
         // de plaatshouder van het eerste (actieve) tabblad
         app.tabs.push(crate::tabs::DocState::empty(app.base_dir.clone(), u64::MAX));
         app.load_library();
@@ -309,6 +324,8 @@ impl App {
             Action::Help => self.show_help = true,
             Action::Welkomstblad => self.text_in_tab(WELKOM),
             Action::Instellingen => self.cv.show_settings = true,
+            Action::Zoeken => self.open_find(false),
+            Action::Vervangen => self.open_find(true),
         }
     }
 
@@ -382,6 +399,7 @@ impl App {
                 Action::Help => i::HELP,
                 Action::Welkomstblad => i::BOOK,
                 Action::Instellingen => i::SETTINGS,
+                Action::Zoeken | Action::Vervangen => i::SEARCH,
             };
             let mut b = egui::Button::new(format!("{icon}   {}", a.label()));
             if let Some(sc) = km.shortcut(a) {
@@ -409,7 +427,7 @@ impl App {
                 item(ui, &self.keymap, Action::Instellingen, &mut chosen);
             });
             ui.menu_button("Beeld", |ui| {
-                for a in [Action::BronTonen, Action::Groter, Action::Kleiner, Action::Herberekenen] {
+                for a in [Action::Zoeken, Action::Vervangen, Action::BronTonen, Action::Groter, Action::Kleiner, Action::Herberekenen] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
                 ui.separator();
@@ -658,6 +676,11 @@ Find(x, y) =
 Zie README.md en docs/PLAN.md voor alles."#;
 
 impl eframe::App for App {
+    /// Netjes afgesloten: de herstelkopieën zijn niet meer nodig.
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.clear_recovery();
+    }
+
     fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
         if let Some(s) = &mut self.shot {
             s.inject(raw);
@@ -667,6 +690,20 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = &ui.ctx().clone();
 
+        // bestanden van een tweede start (dubbelklik in de Verkenner): een tabblad, en naar voren
+        let requests = self.inbox.as_ref().map(|i| i.take()).unwrap_or_default();
+        if !requests.is_empty() {
+            for p in requests.into_iter().flatten() {
+                self.open_in_tab(p);
+            }
+            // zonder dit schuift egui bij het terugkrijgen van de focus het werkblad (de widget met
+            // toetsenbordfocus) naar beneden; een klik op het blad geeft het de focus weer
+            if let Some(id) = ctx.memory(|m| m.focused()) {
+                ctx.memory_mut(|m| m.surrender_focus(id));
+            }
+            ctx.send_viewport_cmd(ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(ViewportCommand::Focus);
+        }
         // Ctrl+Tab en Ctrl+Shift+Tab: volgend en vorig tabblad (vóór de toetsen van het werkblad)
         let back = ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Tab));
         let fwd = ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Tab));
@@ -705,6 +742,9 @@ impl eframe::App for App {
             .frame(egui::Frame::new().fill(tab_fill).inner_margin(egui::Margin { left: 0, right: 0, top: 5, bottom: 0 }))
             .show_separator_line(false)
             .show(ui, |ui| self.tab_bar(ctx, ui));
+        if self.find.is_some() {
+            egui::Panel::top("zoeken").show(ui, |ui| self.find_bar(ui));
+        }
         egui::Panel::bottom("status").show(ui, |ui| {
             ui.horizontal(|ui| {
                 let errors = self.sheet.error_count();
@@ -758,6 +798,8 @@ impl eframe::App for App {
         self.dialogs(ctx);
         self.functions_window(ctx);
         self.settings_window(ctx);
+        self.recovery_window(ctx);
+        self.autosave(ctx);
         if self.cv.set.thema == crate::settings::Thema::Systeem {
             self.apply_theme(ctx);
         }

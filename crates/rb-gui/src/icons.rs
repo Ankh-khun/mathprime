@@ -44,6 +44,7 @@ pub const EMPTY: char = '\u{eb2c}';
 pub const REFRESH: char = '\u{eb13}';
 pub const HELP: char = '\u{eabf}';
 pub const KEYBOARD: char = '\u{ebd6}';
+pub const SEARCH: char = '\u{eb1c}';
 pub const NEW: char = '\u{eaa0}';
 pub const OPEN: char = '\u{faf7}';
 pub const SAVE: char = '\u{eb62}';
