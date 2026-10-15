@@ -1,0 +1,13 @@
+@0,1 # Welkom bij MathPrime
+@0,4 " Werkt zoals Mathcad Prime: klik op een lege plek (rood kruisje) en typ. : is definitie, = rekent uit, / maakt een breuk, Spatie vergroot de selectie, Ctrl+G geeft een Griekse letter. Klik op een formule om hem te wijzigen; sleep om te verplaatsen.
+@0,8 " Een ligger op twee steunpunten met een gelijkmatig verdeelde last
+@0,10 q := 3 kN/m
+@0,13 L := 4 m
+@22,13 E := 210 GPa
+@44,13 I := 8e6 mm^4
+@0,15 M.max := q * L^2 / 8
+@40,15 M.max =
+@0,18 w(x) := q x (L^3 - 2 L x^2 + x^3) / (24 E I)
+@0,21 w(L / 2) = mm
+@0,24 plot x = 0 m ; L : w(x) = mm
+@0,47 " Probeer: klik op 4 m en maak er 5 m van, of druk F2 voor de functies en F1 voor hulp.

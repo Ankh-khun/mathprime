@@ -1,0 +1,7 @@
+" Solve block
+x := 1
+y := 1
+Given
+x + y == 10
+x - y == 2
+sol := Find(x, y) =

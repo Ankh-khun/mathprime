@@ -1,0 +1,16 @@
+" Ingebouwde functies
+a := sin(30 deg) =
+b := cos(π/3) =
+c := tan(45 deg) =
+d := atan(1) =
+e1 := exp(2) =
+f := ln(10) =
+g1 := log(1000) =
+h := sqrt(2) =
+k := nthroot(27, 3) =
+n := abs(-7.5) =
+o := floor(2.7) + ceil(2.2) =
+r := round(3.456, 2) =
+s := mod(17, 5) =
+u := max(3, 9, 4) =
+w := min(3, 9, 4) =

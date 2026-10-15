@@ -1,0 +1,10 @@
+[package]
+name = "rb-edit"
+version.workspace = true
+edition.workspace = true
+description = "Structuurgebaseerde formule-editor (zoals Mathcad Prime) voor MathPrime"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-core = { path = "../rb-core" }
+rb-layout = { path = "../rb-layout" }

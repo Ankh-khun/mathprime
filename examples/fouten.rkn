@@ -1,0 +1,24 @@
+# Zo meldt Rekenblad fouten
+
+" Verkeerde eenheden
+a := 5 m
+b := 3 s
+a + b =
+c := a / b
+c = km/hr
+
+" Naam gebruikt voor hij gedefinieerd is
+d := a * x
+x := 2
+d =
+
+" Rekenfouten en schrijffouten
+e := 1 / 0
+e =
+g := (a + 2
+sin(a) =
+a = 5
+
+" Waarschuwing: s is de eenheid seconde, maar wordt verderop een variabele
+t.1 := 4 s
+s := 10 m

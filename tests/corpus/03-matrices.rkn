@@ -1,0 +1,12 @@
+" Matrices en vectoren
+M := [2, 1; 1, 3]
+d := det(M) =
+T := transpose(M) =
+Mi := inverse(M) =
+b := [1; 2]
+x := lsolve(M, b) =
+ev := eigenvals(M) =
+v := [10; 20; 30]
+v0 := v[0] =
+n := rows(v) =
+s := sum(v[i], i, 0, 2) =

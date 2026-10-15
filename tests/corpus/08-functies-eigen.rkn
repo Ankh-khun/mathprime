@@ -1,0 +1,7 @@
+" Eigen functies
+f(x) := 3 * x^2 - 2 * x + 1
+f(2) =
+g(a, b) := sqrt(a^2 + b^2)
+g(3, 4) =
+h(t) := 5 m * sin(2 * π * t / 4 s)
+h(1 s) =

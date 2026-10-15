@@ -1,0 +1,15 @@
+# Symbolisch rekenen (→)
+
+(x + 1)^2 → expand
+
+x^2 - 5*x + 6 → factor
+
+x^2 - 4 == 0 → solve, x
+
+a*x^2 + b → substitute, x = 2
+
+2*x + 3*x → simplify
+
+deriv(x^3 + 2*x, x, x) →
+
+integral(t, t, 0, x) → simplify

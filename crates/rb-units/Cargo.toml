@@ -1,0 +1,7 @@
+[package]
+name = "rb-units"
+version.workspace = true
+edition.workspace = true
+description = "Dimensies, eenheden en grootheden voor MathPrime"
+
+[dependencies]

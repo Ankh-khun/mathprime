@@ -1,0 +1,16 @@
+[package]
+name = "rb-cli"
+version.workspace = true
+edition.workspace = true
+description = "Command-line interface voor MathPrime"
+
+[[bin]]
+name = "mathprime-cli"
+path = "src/main.rs"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-core = { path = "../rb-core" }
+rb-sheet = { path = "../rb-sheet" }
+rb-export = { path = "../rb-export" }
+rb-mcdx = { path = "../rb-mcdx" }

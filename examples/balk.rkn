@@ -1,0 +1,25 @@
+# Vrij opgelegde balk met gelijkmatig verdeelde belasting
+
+" Gegevens
+L := 2 m               // overspanning
+q := 3 kN/m            // lijnlast
+b := 50 mm
+h := 120 mm
+E := 210 GPa
+
+" Moment, weerstandsmoment en buigspanning
+M.max := q * L^2 / 8
+W := b * h^2 / 6
+sigma := M.max / W
+
+M.max = kN*m
+W = cm^3
+sigma = MPa
+
+" Doorbuiging
+I := b * h^3 / 12
+f.max := 5 * q * L^4 / (384 * E * I)
+f.max = mm
+
+" Parametersweep: buigspanning bij verschillende hoogtes
+sweep hh = 80 mm ; 160 mm ; 5 : 6 * M.max / (b * hh^2) = MPa

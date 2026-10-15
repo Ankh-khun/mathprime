@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/rb-units",
+    "crates/rb-core",
+    "crates/rb-sheet",
+    "crates/rb-layout",
+    "crates/rb-edit",
+    "crates/rb-zipxml",
+    "crates/rb-mcdx",
+    "crates/rb-export",
+    "crates/rb-cli",
+    "crates/rb-gui",
+]
+
+[workspace.package]
+version = "1.2.0"
+edition = "2021"
+
+[profile.release]
+lto = true
+codegen-units = 1

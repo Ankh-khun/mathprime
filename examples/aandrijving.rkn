@@ -1,0 +1,20 @@
+# Aandrijving: koppel, vermogen en toerental
+
+" Motor
+P := 15 kW
+n := 1450 rpm          // rpm = omw/min, dus 2π/60 rad/s: n is al een hoeksnelheid
+
+" Koppel op de as
+M := P / n
+M = N*m
+
+" Schijfdiameter 200 mm: omtrekssnelheid en tangentiale kracht
+d := 200 mm
+v := n * d / 2
+F.t := M / (d / 2)
+v = m/s
+F.t = kN
+
+" Hetzelfde met een functie
+koppel(P, n) := P / n
+koppel(7.5 kW, 960 rpm) = N*m

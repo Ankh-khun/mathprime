@@ -1,0 +1,10 @@
+[package]
+name = "rb-sheet"
+version.workspace = true
+edition.workspace = true
+description = "Werkblad, afhankelijkheidsgraaf en herberekening voor MathPrime"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-zipxml = { path = "../rb-zipxml" }
+rb-core = { path = "../rb-core" }

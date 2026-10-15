@@ -1,0 +1,9 @@
+[package]
+name = "rb-layout"
+version.workspace = true
+edition.workspace = true
+description = "Formuleweergave (2D-layout van breuken, machten, wortels, matrices) voor MathPrime"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-core = { path = "../rb-core" }

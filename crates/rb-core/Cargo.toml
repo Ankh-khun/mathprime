@@ -1,0 +1,8 @@
+[package]
+name = "rb-core"
+version.workspace = true
+edition.workspace = true
+description = "Lexer, parser en evaluator voor MathPrime"
+
+[dependencies]
+rb-units = { path = "../rb-units" }

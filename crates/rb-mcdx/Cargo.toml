@@ -1,0 +1,14 @@
+[package]
+name = "rb-mcdx"
+version.workspace = true
+edition.workspace = true
+description = "Mathcad Prime-bestanden (.mcdx) lezen en schrijven voor MathPrime"
+
+[dependencies]
+# de onderdelen van een .mcdx (een ZIP-bestand) zijn met deflate ingepakt
+miniz_oxide = "0.9"
+rb-core = { path = "../rb-core" }
+rb-sheet = { path = "../rb-sheet" }
+rb-units = { path = "../rb-units" }
+rb-zipxml = { path = "../rb-zipxml" }
+

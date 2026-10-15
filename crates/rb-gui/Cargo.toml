@@ -1,0 +1,28 @@
+[package]
+name = "rb-gui"
+version.workspace = true
+edition.workspace = true
+description = "Grafische interface voor MathPrime (egui)"
+
+[[bin]]
+name = "mathprime"
+path = "src/main.rs"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-core = { path = "../rb-core" }
+rb-sheet = { path = "../rb-sheet" }
+rb-layout = { path = "../rb-layout" }
+rb-export = { path = "../rb-export" }
+rb-edit = { path = "../rb-edit" }
+rb-mcdx = { path = "../rb-mcdx" }
+# OpenGL-backend (glow): kleiner en sneller te bouwen dan wgpu
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit", "x11", "wayland"] }
+egui_plot = "0.37"
+epaint_default_fonts = "0.36"
+# systeemdialogen voor openen en opslaan
+rfd = "0.17"
+# PNG-schermafdruk voor tests (zie src/shot.rs)
+miniz_oxide = "0.9"
+
+[dev-dependencies]

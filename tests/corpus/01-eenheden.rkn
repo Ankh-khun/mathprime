@@ -1,0 +1,17 @@
+" Rekenen met eenheden
+F := 12 kN
+A := 250 mm^2
+σ := F / A =
+σ = MPa
+L := 3.5 m
+v := L / 12 s =
+v = km/hr
+E := 1/2 * 80 kg * v^2 =
+P := 2.2 kW
+t := 15 min
+W := P * t =
+W = kW*hr
+p := 2.5 bar =
+p = Pa
+m := 4 lb =
+d := 3 in + 2 ft =

@@ -1,0 +1,65 @@
+# Nieuw in fase 1: logica, bereiken, matrices, calculus, complexe getallen en temperaturen
+
+" Stuksgewijze functie: moment in een ligger met een puntlast F op afstand a
+L := 4 m
+F := 10 kN
+a := 1 m
+R.A := F * (L - a) / L
+M(x) := if(x <= a, R.A * x, R.A * x - F * (x - a))
+M(a) = kN*m
+
+" Een bereik geeft een tabel (impliciete iteratie, zoals in Mathcad)
+x := 0 m, 1 m .. 4 m
+M(x) = kN*m
+
+" Integraal en afgeleide (de gebonden x botst niet met het bereik x hierboven)
+integral(M(x), x, 0 m, L) = kN*m^2
+deriv(M(x), x, 2 m) = kN
+
+" Vectoren via een bereik: weerstandsmoment bij vier hoogtes
+b.0 := 50 mm
+i := 0..3
+h[i] := (80 + 40 * i) mm
+W[i] := b.0 * h[i]^2 / 6
+W = cm^3
+max(W) = cm^3
+
+" Matrices met eenheden: twee veren in serie, K·u = P
+k.1 := 200 N/mm
+k.2 := 100 N/mm
+K := [k.1 + k.2, -k.2; -k.2, k.2]
+P := [0; 1.5] kN
+u := lsolve(K, P)
+u = mm
+det(K) = (N/mm)^2
+
+" Temperaturen: lengteverandering van een stalen staaf
+α := 12e-6 / Δ°C
+L.0 := 2 m
+T.1 := 20 °C
+T.2 := 80 °C
+ΔL := α * L.0 * (T.2 - T.1)
+ΔL = mm
+T.2 =
+T.2 = °F
+
+" Complexe getallen: impedantie van een RLC-serieschakeling bij 50 Hz
+R := 10 ohm
+L.s := 50 mH
+C := 100 µF
+ω := 2 π * 50 Hz
+Z := R + 1i * ω * L.s + 1 / (1i * ω * C)
+Z =
+abs(Z) =
+arg(Z) = deg
+
+" Vergelijken en logica geven 1 (waar) of 0 (onwaar)
+L > 3 m and F < 20 kN =
+0 < ΔL < 1 mm =
+
+" Weergave-eenheid volgt de definitie
+E := 2.5 kJ
+E.tot := 3 E + 500 J
+E.tot =
+n := 1450 rpm
+n =

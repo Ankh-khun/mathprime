@@ -1,0 +1,612 @@
+//! Functies die een functie of uitdrukking als argument krijgen: `root`, `linfit`, `genfit`,
+//! `rkfixed`/`Rkadapt`, solve blocks (`Find`, `Minerr`, `Minimize`, `Maximize`) en `odesolve`.
+//!
+//! Onbekenden en parameters worden intern geschaald (gedeeld door hun startwaarde, of 1 in SI als
+//! die 0 is), zodat de oplossers met getallen van orde 1 werken, wat de eenheid ook is.
+
+use super::*;
+use crate::ast::{CmpOp, Table};
+use crate::fit;
+use std::sync::Arc;
+
+/// Soort beperking in een Given-blok.
+#[derive(Clone, Copy, PartialEq)]
+enum Kind {
+    Eq,
+    /// links ≤ rechts
+    Le,
+    /// links ≥ rechts
+    Ge,
+    Ne,
+}
+
+fn scale_of(x: f64) -> f64 {
+    if x != 0.0 && x.is_finite() {
+        x.abs()
+    } else {
+        1.0
+    }
+}
+
+/// Een waarde als (SI-getal, eenheid); complexe getallen en matrices geven een fout.
+fn real(v: Value, what: &str) -> Result<Quantity, Error> {
+    v.as_quantity(what)
+}
+
+/// Waarden van een vector of los getal, met eenheid per element.
+fn components(v: &Value, what: &str) -> Result<Vec<Quantity>, Error> {
+    match v {
+        Value::Num(q) => Ok(vec![*q]),
+        Value::Matrix(m) if m.is_vector() && !m.is_complex() => Ok(m.data.clone()),
+        other => Err(dom(format!("{what} moet een reëel getal of een reële vector zijn, geen {}", other.kind()))),
+    }
+}
+
+fn vector_value(qs: Vec<Quantity>) -> Value {
+    if qs.len() == 1 {
+        Value::Num(qs[0])
+    } else {
+        Value::Matrix(Matrix::column(qs))
+    }
+}
+
+impl Env {
+    /// Geef de beperkingen van het Given-blok door aan de volgende oplosregel (`Find`, ...).
+    pub fn set_constraints(&mut self, constraints: Vec<Expr>) {
+        self.constraints = constraints;
+    }
+
+    /// Roep een eigen functie aan met al uitgerekende argumenten.
+    pub(super) fn call_user(&self, name: &str, vals: Vec<Value>, depth: usize) -> Result<Value, Error> {
+        let f = self
+            .funcs
+            .get(name)
+            .ok_or_else(|| dom(format!("'{name}' is geen eigen functie (definieer bijvoorbeeld {name}(x) := ...)")))?;
+        if f.params.len() != vals.len() {
+            return Err(Error::Arity {
+                name: name.to_string(),
+                expected: f.params.len().to_string(),
+                got: vals.len(),
+            });
+        }
+        if depth >= MAX_DEPTH {
+            return Err(Error::Depth);
+        }
+        let scope: Locals = f.params.iter().cloned().zip(vals).collect();
+        self.eval(&f.body, &scope, depth + 1)
+    }
+
+    /// De naam van een eigen functie die als argument is meegegeven (`linfit(vx, vy, F)`).
+    fn fn_arg<'a>(&self, e: &'a Expr, what: &str) -> Result<&'a str, Error> {
+        match e {
+            Expr::Var(n) if self.funcs.contains_key(n) => Ok(n),
+            _ => Err(dom(format!(
+                "{what}: dit argument moet de naam van een eigen functie zijn (bijvoorbeeld F, met F(x) := ...)"
+            ))),
+        }
+    }
+
+    /// Speciale functies met een functie als argument. `None`: geen van deze namen.
+    pub(super) fn call_with_functions(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Option<Result<Value, Error>> {
+        Some(match name {
+            "linfit" => self.linfit(args, loc, depth),
+            "genfit" => self.genfit(args, loc, depth),
+            "rkfixed" | "Rkadapt" => self.ode_fixed(name, args, loc, depth),
+            "Find" | "Minerr" => self.find(name, args, loc, depth),
+            "Minimize" | "Maximize" => self.minimize(name, args, loc, depth),
+            _ => return None,
+        })
+    }
+
+    fn want(name: &str, args: &[Expr], n: usize) -> Result<(), Error> {
+        if args.len() == n {
+            Ok(())
+        } else {
+            Err(Error::Arity {
+                name: name.to_string(),
+                expected: n.to_string(),
+                got: args.len(),
+            })
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Regressie met eigen functies
+
+    /// `linfit(vx, vy, F)`: coëfficiënten c zodat Σ c_j·F(x)_j zo goed mogelijk door de punten gaat.
+    fn linfit(&self, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        Self::want("linfit", args, 3)?;
+        let (vx, vy) = (self.eval(&args[0], loc, depth)?, self.eval(&args[1], loc, depth)?);
+        let (x, dx, y, dy) = fit::xy("linfit", &vx, &vy, 1, false)?;
+        let f = self.fn_arg(&args[2], "linfit")?;
+        let mut a = Vec::new();
+        let mut dims: Option<Vec<Dim>> = None;
+        for &xi in &x {
+            let row = components(&self.call_user(f, vec![Value::Num(Quantity::new(xi, dx))], depth)?, "F(x)")?;
+            let d: Vec<Dim> = row.iter().map(|q| q.dim).collect();
+            match &dims {
+                None => dims = Some(d),
+                Some(prev) if *prev != d => return Err(dom("linfit: de eenheden van F(x) veranderen per punt")),
+                _ => {}
+            }
+            a.extend(row.iter().map(|q| q.value));
+        }
+        let dims = dims.expect("minstens één punt");
+        let c = numeric::least_squares(&a, x.len(), dims.len(), &y)?;
+        let qs = c
+            .iter()
+            .zip(&dims)
+            .map(|(v, d)| Ok(Quantity::new(*v, dy.checked_div(*d).ok_or(rb_units::UnitError::Overflow)?)))
+            .collect::<Result<Vec<_>, Error>>()?;
+        Ok(Value::Matrix(Matrix::column(qs)))
+    }
+
+    /// `genfit(vx, vy, vg, F)`: parameters u (startwaarden vg) zodat F(x, u) zo goed mogelijk door
+    /// de punten gaat (Levenberg–Marquardt).
+    fn genfit(&self, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        Self::want("genfit", args, 4)?;
+        let (vx, vy) = (self.eval(&args[0], loc, depth)?, self.eval(&args[1], loc, depth)?);
+        let (x, dx, y, dy) = fit::xy("genfit", &vx, &vy, 1, false)?;
+        let guess = components(&self.eval(&args[2], loc, depth)?, "vg")?;
+        let f = self.fn_arg(&args[3], "genfit")?;
+        let scales: Vec<f64> = guess.iter().map(|q| scale_of(q.value)).collect();
+        let ys = y.iter().fold(0.0f64, |m, v| m.max(v.abs())).max(f64::MIN_POSITIVE);
+        let params = |p: &[f64]| -> Value {
+            let qs: Vec<Quantity> = p.iter().zip(&guess).zip(&scales).map(|((v, g), s)| Quantity::new(v * s, g.dim)).collect();
+            Value::Matrix(Matrix::column(qs))
+        };
+        let mut resid = |p: &[f64]| -> Result<Vec<f64>, Error> {
+            let u = params(p);
+            x.iter()
+                .zip(&y)
+                .map(|(&xi, &yi)| {
+                    let m = real(self.call_user(f, vec![Value::Num(Quantity::new(xi, dx)), u.clone()], depth)?, "F(x, u)")?;
+                    if m.dim != dy {
+                        return Err(dom("genfit: F(x, u) heeft niet dezelfde eenheid als vy"));
+                    }
+                    Ok((m.value - yi) / ys)
+                })
+                .collect()
+        };
+        let p0: Vec<f64> = guess.iter().zip(&scales).map(|(g, s)| g.value / s).collect();
+        let (p, _) = numeric::levenberg_marquardt(&mut resid, p0)?;
+        match params(&p) {
+            Value::Matrix(m) => Ok(Value::Matrix(m)),
+            v => Ok(v),
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Differentiaalvergelijkingen
+
+    /// `rkfixed(y, x1, x2, n, D)` en `Rkadapt(...)`: matrix met x in kolom 0 en y in de volgende kolommen.
+    fn ode_fixed(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        Self::want(name, args, 5)?;
+        let y0 = components(&self.eval(&args[0], loc, depth)?, "de beginwaarde y")?;
+        let x1 = real(self.eval(&args[1], loc, depth)?, "x1")?;
+        let x2 = real(self.eval(&args[2], loc, depth)?, "x2")?;
+        x1.same_dim(x2, "de grenzen van de differentiaalvergelijking")?;
+        let n = real(self.eval(&args[3], loc, depth)?, "het aantal punten")?.dimensionless_value("het aantal punten")?;
+        if n.fract() != 0.0 || !(1.0..=100_000.0).contains(&n) {
+            return Err(dom(format!("{name}: het aantal punten moet een geheel getal van 1 tot en met 100000 zijn")));
+        }
+        let d = self.fn_arg(&args[4], name)?;
+        let ydims: Vec<Dim> = y0.iter().map(|q| q.dim).collect();
+        let want: Vec<Dim> = ydims
+            .iter()
+            .map(|yd| yd.checked_div(x1.dim).ok_or(rb_units::UnitError::Overflow))
+            .collect::<Result<_, _>>()?;
+        let mut rhs = |x: f64, y: &[f64]| -> Result<Vec<f64>, Error> {
+            let yv = vector_value(y.iter().zip(&ydims).map(|(v, d)| Quantity::new(*v, *d)).collect());
+            let out = components(&self.call_user(d, vec![Value::Num(Quantity::new(x, x1.dim)), yv], depth)?, "D(x, y)")?;
+            if out.len() != y.len() {
+                return Err(dom(format!("{name}: D(x, y) moet evenveel componenten geven als y ({})", y.len())));
+            }
+            for (q, w) in out.iter().zip(&want) {
+                if q.dim != *w {
+                    return Err(dom(format!(
+                        "{name}: D(x, y) moet de eenheid y/x hebben, maar een component heeft {}",
+                        q.dim.describe()
+                    )));
+                }
+            }
+            Ok(out.iter().map(|q| q.value).collect())
+        };
+        let start: Vec<f64> = y0.iter().map(|q| q.value).collect();
+        let n = n as usize;
+        let sol = if name == "rkfixed" {
+            numeric::rk4(&mut rhs, &start, x1.value, x2.value, n)?
+        } else {
+            numeric::dopri(&mut rhs, &start, x1.value, x2.value, n, 1e-10)?
+        };
+        let cols = 1 + start.len();
+        let mut data = Vec::with_capacity((n + 1) * cols);
+        for (k, row) in sol.iter().enumerate() {
+            data.push(Quantity::new(x1.value + (x2.value - x1.value) * k as f64 / n as f64, x1.dim));
+            data.extend(row.iter().zip(&ydims).map(|(v, d)| Quantity::new(*v, *d)));
+        }
+        Ok(Value::Matrix(Matrix::new(n + 1, cols, data)))
+    }
+
+    /// `y := odesolve(t, b)`: los de differentiaalvergelijking in het Given-blok op van het
+    /// beginpunt tot b. Geeft een functie y(t) (kubische Hermite-interpolatie in 1000 stappen).
+    pub(super) fn odesolve(&self, fname: &str, tvar: &str, end: &Expr) -> Result<UserFn, Error> {
+        if self.constraints.is_empty() {
+            return Err(dom("odesolve hoort onder een Given-blok met de differentiaalvergelijking en de beginvoorwaarden"));
+        }
+        let order = |n: &str| -> Option<usize> {
+            (n.trim_end_matches('\'') == fname).then(|| n.len() - n.trim_end_matches('\'').len())
+        };
+        // de vergelijking zelf: bevat y^(k)(t); de rest zijn beginvoorwaarden y^(k)(a) == waarde
+        let mut ode: Option<Expr> = None;
+        let mut max_order = 0;
+        let mut ics: Vec<(usize, Quantity, Quantity)> = Vec::new();
+        for c in &self.constraints {
+            let (l, r) = match c {
+                Expr::Cmp(ops, xs) if ops.len() == 1 && ops[0] == CmpOp::Eq => (&xs[0], &xs[1]),
+                _ => return Err(dom("odesolve: elke beperking moet een gelijkheid met == zijn")),
+            };
+            let mut found = Vec::new();
+            find_calls(c, &order, tvar, &mut found);
+            if found.iter().any(|(_, on_t)| *on_t) {
+                if ode.is_some() {
+                    return Err(dom("odesolve: er mag maar één differentiaalvergelijking in het blok staan"));
+                }
+                max_order = found.iter().filter(|(_, t)| *t).map(|(k, _)| *k).max().unwrap_or(0);
+                if max_order == 0 {
+                    return Err(dom(format!("odesolve: de vergelijking bevat geen afgeleide van {fname}")));
+                }
+                // een kale 0 aan één kant past bij elke eenheid: dan is de andere kant het residu
+                let (l, r) = (substitute(l, &order, tvar), substitute(r, &order, tvar));
+                ode = Some(match (&l, &r) {
+                    (_, Expr::Num(z)) if *z == 0.0 => l,
+                    (Expr::Num(z), _) if *z == 0.0 => r,
+                    _ => Expr::Bin(BinOp::Sub, Box::new(l), Box::new(r)),
+                });
+                continue;
+            }
+            // beginvoorwaarde: y^(k)(a) == waarde (of andersom)
+            let (call, other) = match (l, r) {
+                (Expr::Call(n, a), o) | (o, Expr::Call(n, a)) if order(n).is_some() && a.len() == 1 => ((n, &a[0]), o),
+                _ => return Err(dom(format!("odesolve: een beginvoorwaarde schrijf je als {fname}(0) == 1 of {fname}'(0) == 0"))),
+            };
+            let k = order(call.0).unwrap();
+            let at = real(self.eval_expr(call.1)?, "het beginpunt")?;
+            let val = real(self.eval_expr(other)?, "een beginwaarde")?;
+            ics.push((k, at, val));
+        }
+        let ode = ode.ok_or_else(|| dom(format!("odesolve: geen differentiaalvergelijking met {fname}'({tvar}) gevonden")))?;
+        let a = ics.first().map(|ic| ic.1).ok_or_else(|| dom("odesolve: beginvoorwaarden ontbreken"))?;
+        let mut init = vec![None; max_order];
+        for (k, at, val) in &ics {
+            if *k >= max_order {
+                return Err(dom("odesolve: een beginvoorwaarde voor de hoogste afgeleide kan niet"));
+            }
+            if at.dim != a.dim || (at.value - a.value).abs() > 1e-12 * a.value.abs().max(1e-300) {
+                return Err(dom("odesolve: alle beginvoorwaarden moeten in hetzelfde punt gelden"));
+            }
+            init[*k] = Some(*val);
+        }
+        let primes = |k: usize| "'".repeat(k);
+        let init: Vec<Quantity> = init
+            .into_iter()
+            .enumerate()
+            .map(|(k, v)| v.ok_or_else(|| dom(format!("odesolve: de beginvoorwaarde voor {fname}{}({}) ontbreekt", primes(k), a))))
+            .collect::<Result<_, _>>()?;
+        let tdim = a.dim;
+        let ydim = init[0].dim;
+        let dims: Vec<Dim> = (0..=max_order)
+            .map(|k| tdim.checked_powi(k as i32).and_then(|p| ydim.checked_div(p)).ok_or(rb_units::UnitError::Overflow))
+            .collect::<Result<_, _>>()?;
+        for (k, q) in init.iter().enumerate() {
+            if q.dim != dims[k] {
+                return Err(dom(format!(
+                    "odesolve: de beginwaarde van {fname}{} heeft eenheid {}, verwacht {}",
+                    primes(k),
+                    q.dim.describe(),
+                    dims[k].describe()
+                )));
+            }
+        }
+        let b = real(self.eval_expr(end)?, "de eindwaarde")?;
+        b.same_dim(a, "odesolve (beginpunt en eindwaarde)")?;
+        let n = max_order;
+        let mut base = Locals::new();
+        let residual = |t: f64, s: &[f64], top: f64, base: &mut Locals| -> Result<f64, Error> {
+            base.insert(tvar.to_string(), Value::Num(Quantity::new(t, tdim)));
+            for k in 0..n {
+                base.insert(format!("__y{k}"), Value::Num(Quantity::new(s[k], dims[k])));
+            }
+            base.insert(format!("__y{n}"), Value::Num(Quantity::new(top, dims[n])));
+            Ok(real(self.eval(&ode, base, 0)?, "de differentiaalvergelijking")?.value)
+        };
+        // hoogste afgeleide uit de vergelijking halen (meestal lineair: twee evaluaties volstaan)
+        let mut rhs = |t: f64, s: &[f64]| -> Result<Vec<f64>, Error> {
+            let r0 = residual(t, s, 0.0, &mut base)?;
+            let r1 = residual(t, s, 1.0, &mut base)?;
+            if r1 == r0 {
+                return Err(dom(format!("odesolve: de vergelijking hangt niet af van {fname}{}", primes(n))));
+            }
+            let mut top = -r0 / (r1 - r0);
+            let rt = residual(t, s, top, &mut base)?;
+            if rt.abs() > 1e-9 * (r0.abs() + r1.abs()) {
+                let mut g = |z: f64| residual(t, s, z, &mut base);
+                top = numeric::root_from_guess(&mut g, top)?;
+            }
+            let mut d: Vec<f64> = s[1..].to_vec();
+            d.push(top);
+            Ok(d)
+        };
+        let steps = 1000;
+        let start: Vec<f64> = init.iter().map(|q| q.value).collect();
+        let sol = numeric::dopri(&mut rhs, &start, a.value, b.value, steps, 1e-10)?;
+        let ts: Vec<f64> = (0..=steps).map(|k| a.value + (b.value - a.value) * k as f64 / steps as f64).collect();
+        let ys: Vec<f64> = sol.iter().map(|s| s[0]).collect();
+        let ds: Vec<f64> = if n >= 2 {
+            sol.iter().map(|s| s[1]).collect()
+        } else {
+            ts.iter().zip(&sol).map(|(t, s)| Ok(rhs(*t, s)?[0])).collect::<Result<_, Error>>()?
+        };
+        let table = Table { ts, ys, ds, tdim, ydim };
+        Ok(UserFn {
+            params: vec![tvar.to_string()],
+            body: Expr::Interp(Arc::new(table), Box::new(Expr::Var(tvar.to_string()))),
+        })
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // root
+
+    /// `root(f(x), x)` vanaf de huidige waarde van x, of `root(f(x), x, a, b)` tussen a en b.
+    pub(super) fn eval_root(&self, body: &Expr, var: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        let (x0, bracket) = if args.is_empty() {
+            let g = self.lookup(var, loc).ok_or_else(|| {
+                dom(format!("root: geef {var} eerst een startwaarde, bijvoorbeeld {var} := 1 (of gebruik root(f, {var}, a, b))"))
+            })?;
+            (real(g, "de startwaarde")?, None)
+        } else {
+            let a = real(self.eval(&args[0], loc, depth)?, "de ondergrens")?;
+            let b = real(self.eval(&args[1], loc, depth)?, "de bovengrens")?;
+            a.same_dim(b, "de grenzen van root")?;
+            (a, Some(b))
+        };
+        let mut scope = loc.clone();
+        let mut f = |x: f64| -> Result<f64, Error> {
+            scope.insert(var.to_string(), Value::Num(Quantity::new(x, x0.dim)));
+            Ok(real(self.eval(body, &scope, depth)?, "de functie in root")?.value)
+        };
+        let r = match bracket {
+            Some(b) => numeric::brent(&mut f, x0.value.min(b.value), x0.value.max(b.value))?,
+            None => numeric::root_from_guess(&mut f, x0.value)?,
+        };
+        Ok(Value::Num(Quantity::new(r, x0.dim)))
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Solve blocks
+
+    /// De onbekenden van `Find(x, y)` / `Minimize(f, x, y)` met hun startwaarden.
+    fn unknowns(&self, name: &str, args: &[Expr], loc: &Locals) -> Result<Vec<(String, Quantity)>, Error> {
+        if args.is_empty() {
+            return Err(dom(format!("{name}: noem de onbekenden, bijvoorbeeld {name}(x, y)")));
+        }
+        args.iter()
+            .map(|a| match a {
+                Expr::Var(n) => {
+                    let g = self.lookup(n, loc).filter(|_| self.is_variable(n, loc)).ok_or_else(|| {
+                        dom(format!("{name}: geef {n} eerst een startwaarde boven het Given-blok, bijvoorbeeld {n} := 1"))
+                    })?;
+                    Ok((n.clone(), real(g, "een startwaarde")?))
+                }
+                _ => Err(dom(format!("{name}: de onbekenden moeten namen zijn"))),
+            })
+            .collect()
+    }
+
+    /// Termen van een beperking: (links − rechts, grootte, soort), in SI.
+    fn constraint_terms(&self, e: &Expr, loc: &Locals, out: &mut Vec<(f64, f64, Kind)>) -> Result<(), Error> {
+        match e {
+            Expr::Cmp(ops, xs) => {
+                let vals = xs
+                    .iter()
+                    .map(|x| real(self.eval(x, loc, 0)?, "een kant van een beperking"))
+                    .collect::<Result<Vec<_>, _>>()?;
+                for (k, op) in ops.iter().enumerate() {
+                    let (l, r) = (vals[k], vals[k + 1]);
+                    let bare_zero = |q: &Quantity| q.dim.is_none() && q.value == 0.0;
+                    if !bare_zero(&l) && !bare_zero(&r) {
+                        l.same_dim(r, "een beperking")?;
+                    }
+                    let kind = match op {
+                        CmpOp::Eq => Kind::Eq,
+                        CmpOp::Lt | CmpOp::Le => Kind::Le,
+                        CmpOp::Gt | CmpOp::Ge => Kind::Ge,
+                        CmpOp::Ne => Kind::Ne,
+                    };
+                    out.push((l.value - r.value, l.value.abs().max(r.value.abs()), kind));
+                }
+                Ok(())
+            }
+            Expr::And(a, b) => {
+                self.constraint_terms(a, loc, out)?;
+                self.constraint_terms(b, loc, out)
+            }
+            _ => Err(dom("een beperking in een Given-blok moet een vergelijking zijn, zoals x + y == 10 of x > 0")),
+        }
+    }
+
+    /// Geschaalde residuen van alle beperkingen bij gegeven waarden van de onbekenden.
+    fn residuals(&self, unknowns: &[(String, Quantity)], x: &[f64], loc: &Locals, scales: Option<&[f64]>) -> Result<(Vec<f64>, Vec<f64>), Error> {
+        let mut scope = loc.clone();
+        for ((n, g), v) in unknowns.iter().zip(x) {
+            scope.insert(n.clone(), Value::Num(Quantity::new(*v, g.dim)));
+        }
+        let mut terms = Vec::new();
+        for c in &self.constraints {
+            self.constraint_terms(c, &scope, &mut terms)?;
+        }
+        let mags: Vec<f64> = terms.iter().map(|t| scale_of(t.1)).collect();
+        let sc = scales.unwrap_or(&mags);
+        let r = terms
+            .iter()
+            .zip(sc)
+            .map(|((d, _, k), s)| {
+                let v = match k {
+                    Kind::Eq => *d,
+                    Kind::Le => d.max(0.0),
+                    Kind::Ge => (-d).max(0.0),
+                    Kind::Ne => 0.0,
+                };
+                v / s
+            })
+            .collect();
+        Ok((r, mags))
+    }
+
+    fn result_value(unknowns: &[(String, Quantity)], x: &[f64]) -> Value {
+        vector_value(unknowns.iter().zip(x).map(|((_, g), v)| Quantity::new(*v, g.dim)).collect())
+    }
+
+    /// `Find(x, y)` en `Minerr(x, y)`: maak de beperkingen van het Given-blok waar.
+    fn find(&self, name: &str, args: &[Expr], loc: &Locals, _depth: usize) -> Result<Value, Error> {
+        if self.constraints.is_empty() {
+            return Err(dom(format!(
+                "{name} hoort onder een Given-blok: een regel 'Given', daaronder de vergelijkingen (met ==), dan {name}(...)"
+            )));
+        }
+        let unknowns = self.unknowns(name, args, loc)?;
+        let xs: Vec<f64> = unknowns.iter().map(|(_, g)| scale_of(g.value)).collect();
+        let x0: Vec<f64> = unknowns.iter().map(|(_, g)| g.value).collect();
+        let (_, mags) = self.residuals(&unknowns, &x0, loc, None)?;
+        let mut f = |p: &[f64]| -> Result<Vec<f64>, Error> {
+            let x: Vec<f64> = p.iter().zip(&xs).map(|(a, b)| a * b).collect();
+            Ok(self.residuals(&unknowns, &x, loc, Some(&mags))?.0)
+        };
+        let p0: Vec<f64> = x0.iter().zip(&xs).map(|(a, b)| a / b).collect();
+        let (p, _) = numeric::levenberg_marquardt(&mut f, p0)?;
+        let x: Vec<f64> = p.iter().zip(&xs).map(|(a, b)| a * b).collect();
+        if name == "Find" {
+            // nauwkeurigheid beoordelen ten opzichte van de grootte in de oplossing
+            let (r, _) = self.residuals(&unknowns, &x, loc, None)?;
+            let worst = r.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+            if worst > 1e-8 {
+                return Err(dom(format!(
+                    "Find: geen oplossing gevonden (grootste relatieve restfout {worst:.2e}); \
+                     probeer andere startwaarden, of Minerr voor de beste benadering"
+                )));
+            }
+        }
+        Ok(Self::result_value(&unknowns, &x))
+    }
+
+    /// `Minimize(f, x, y)` / `Maximize(f, x, y)`, eventueel met de beperkingen van een Given-blok.
+    fn minimize(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        let fname = self.fn_arg(args.first().ok_or_else(|| dom(format!("{name}(f, x, ...): noem eerst de functie")))?, name)?;
+        let unknowns = self.unknowns(name, &args[1..], loc)?;
+        let sign = if name == "Maximize" { -1.0 } else { 1.0 };
+        let xs: Vec<f64> = unknowns.iter().map(|(_, g)| scale_of(g.value)).collect();
+        let x0: Vec<f64> = unknowns.iter().map(|(_, g)| g.value).collect();
+        let objective = |x: &[f64]| -> Result<f64, Error> {
+            let vals = unknowns.iter().zip(x).map(|((_, g), v)| Value::Num(Quantity::new(*v, g.dim))).collect();
+            Ok(real(self.call_user(fname, vals, depth)?, "de functie")?.value)
+        };
+        let g0 = scale_of(objective(&x0)?);
+        let has_constraints = !self.constraints.is_empty();
+        let mags = if has_constraints { self.residuals(&unknowns, &x0, loc, None)?.1 } else { Vec::new() };
+        let mut p: Vec<f64> = x0.iter().zip(&xs).map(|(a, b)| a / b).collect();
+        let weights: &[f64] = if has_constraints { &[1e2, 1e4, 1e6, 1e8, 1e10] } else { &[0.0, 0.0] };
+        for &mu in weights {
+            let mut f = |q: &[f64]| -> Result<f64, Error> {
+                let x: Vec<f64> = q.iter().zip(&xs).map(|(a, b)| a * b).collect();
+                let mut v = sign * objective(&x)? / g0;
+                if mu > 0.0 {
+                    let (r, _) = self.residuals(&unknowns, &x, loc, Some(&mags))?;
+                    v += mu * r.iter().map(|t| t * t).sum::<f64>();
+                }
+                Ok(v)
+            };
+            let step: Vec<f64> = p.iter().map(|v| 0.05 * v.abs().max(0.1)).collect();
+            p = numeric::nelder_mead(&mut f, &p, &step)?;
+        }
+        let x: Vec<f64> = p.iter().zip(&xs).map(|(a, b)| a * b).collect();
+        if has_constraints {
+            let (r, _) = self.residuals(&unknowns, &x, loc, None)?;
+            let worst = r.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+            if worst > 1e-6 {
+                return Err(dom(format!("{name}: de beperkingen zijn niet te vervullen (restfout {worst:.2e})")));
+            }
+        }
+        Ok(Self::result_value(&unknowns, &x))
+    }
+}
+
+/// Zoek aanroepen y^(k)(...) en geef (k, argument is precies t).
+fn find_calls(e: &Expr, order: &dyn Fn(&str) -> Option<usize>, tvar: &str, out: &mut Vec<(usize, bool)>) {
+    match e {
+        Expr::Call(n, args) => {
+            if let Some(k) = order(n) {
+                out.push((k, matches!(args.as_slice(), [Expr::Var(v)] if v == tvar)));
+            }
+            for a in args {
+                find_calls(a, order, tvar, out);
+            }
+        }
+        Expr::Neg(x) | Expr::Not(x) => find_calls(x, order, tvar, out),
+        Expr::Bin(_, a, b) | Expr::And(a, b) | Expr::Or(a, b) => {
+            find_calls(a, order, tvar, out);
+            find_calls(b, order, tvar, out);
+        }
+        Expr::Cmp(_, xs) => xs.iter().for_each(|x| find_calls(x, order, tvar, out)),
+        _ => {}
+    }
+}
+
+/// Vervang y^(k)(t) door de interne variabele `__yk`.
+fn substitute(e: &Expr, order: &dyn Fn(&str) -> Option<usize>, tvar: &str) -> Expr {
+    let s = |x: &Expr| Box::new(substitute(x, order, tvar));
+    match e {
+        Expr::Call(n, args) => match (order(n), args.as_slice()) {
+            (Some(k), [Expr::Var(v)]) if v == tvar => Expr::Var(format!("__y{k}")),
+            _ => Expr::Call(n.clone(), args.iter().map(|a| substitute(a, order, tvar)).collect()),
+        },
+        Expr::Neg(x) => Expr::Neg(s(x)),
+        Expr::Not(x) => Expr::Not(s(x)),
+        Expr::Bin(op, a, b) => Expr::Bin(*op, s(a), s(b)),
+        Expr::And(a, b) => Expr::And(s(a), s(b)),
+        Expr::Or(a, b) => Expr::Or(s(a), s(b)),
+        Expr::Cmp(ops, xs) => Expr::Cmp(ops.clone(), xs.iter().map(|x| substitute(x, order, tvar)).collect()),
+        other => other.clone(),
+    }
+}
+
+/// Kubische Hermite-interpolatie in een tabel uit `odesolve`.
+pub(super) fn interp_table(t: &Table, x: Quantity) -> Result<Value, Error> {
+    if x.dim != t.tdim {
+        return Err(rb_units::UnitError::Mismatch {
+            op: "de functie uit odesolve",
+            left: x.dim,
+            right: t.tdim,
+        }
+        .into());
+    }
+    let n = t.ts.len();
+    let (lo, hi) = (t.ts[0].min(t.ts[n - 1]), t.ts[0].max(t.ts[n - 1]));
+    let tol = 1e-9 * (hi - lo);
+    if x.value < lo - tol || x.value > hi + tol {
+        return Err(dom(format!(
+            "de oplossing van odesolve bestaat alleen tussen {} en {}",
+            format_quantity(Quantity::new(t.ts[0], t.tdim)),
+            format_quantity(Quantity::new(t.ts[n - 1], t.tdim))
+        )));
+    }
+    let step = (t.ts[n - 1] - t.ts[0]) / (n - 1) as f64;
+    let k = (((x.value - t.ts[0]) / step).floor().max(0.0) as usize).min(n - 2);
+    let h = t.ts[k + 1] - t.ts[k];
+    let s = (x.value - t.ts[k]) / h;
+    let (s2, s3) = (s * s, s * s * s);
+    let y = (2.0 * s3 - 3.0 * s2 + 1.0) * t.ys[k]
+        + (s3 - 2.0 * s2 + s) * h * t.ds[k]
+        + (-2.0 * s3 + 3.0 * s2) * t.ys[k + 1]
+        + (s3 - s2) * h * t.ds[k + 1];
+    Ok(Value::Num(Quantity::new(y, t.ydim)))
+}

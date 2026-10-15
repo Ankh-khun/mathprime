@@ -1,0 +1,10 @@
+" Integralen, afgeleiden, sommen
+I1 := integral(x^2, x, 0, 3) =
+I2 := integral(sin(x), x, 0, π) =
+I3 := integral(exp(-x), x, 0, 5) =
+x := 2
+D1 := deriv(x^3, x, x) =
+S := sum(k^2, k, 1, 10) =
+P := prod(k, k, 1, 6) =
+z := 1
+R := root(z^2 - 2, z) =

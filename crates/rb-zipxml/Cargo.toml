@@ -1,0 +1,9 @@
+[package]
+name = "rb-zipxml"
+version.workspace = true
+edition.workspace = true
+description = "Kleine ZIP- en XML-lezer en -schrijver voor MathPrime (.mcdx en .xlsx)"
+
+[dependencies]
+# deflate voor de onderdelen van een ZIP-archief
+miniz_oxide = "0.9"

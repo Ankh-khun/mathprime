@@ -1,0 +1,6 @@
+" Tekst als waarde
+s := concat("Math", "Prime") =
+n := strlen(s) =
+k := substr(s, 0, 4) =
+p := search(s, "Prime", 0) =
+q := str2num("2.5") * 2 =

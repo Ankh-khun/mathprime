@@ -1,0 +1,16 @@
+[package]
+name = "rb-export"
+version.workspace = true
+edition.workspace = true
+description = "Weergave van een werkblad (per regio) en export naar SVG en PDF voor MathPrime"
+
+[dependencies]
+rb-units = { path = "../rb-units" }
+rb-core = { path = "../rb-core" }
+rb-sheet = { path = "../rb-sheet" }
+rb-layout = { path = "../rb-layout" }
+# lettermaten en ingebedde lettertypen (dezelfde als in de interface van egui)
+ttf-parser = "0.25"
+epaint_default_fonts = "0.36"
+# compressie van de PDF-streams
+miniz_oxide = "0.9"
