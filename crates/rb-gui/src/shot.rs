@@ -94,6 +94,10 @@ pub fn script_events(script: &str) -> Vec<egui::Event> {
                 mods.shift = true;
                 continue;
             }
+            '⌥' => {
+                mods.alt = true;
+                continue;
+            }
             '⏎' => Some(Key::Enter),
             '⎋' => Some(Key::Escape),
             '⌫' => Some(Key::Backspace),
@@ -155,7 +159,7 @@ impl Shot {
 
     /// Aanroepen aan het begin van elk frame: speelt vanaf het tweede frame de toetsen uit
     /// `MATHPRIME_KEYS` af, één per frame, als getypte tekst en toetsen. `⏎` Enter, `⎋` Esc,
-    /// `⌫` Backspace, `→←↑↓` pijltjes, `⌃` Ctrl en `⇧` Shift voor de volgende toets (`⌃⇧D`).
+    /// `⌫` Backspace, `→←↑↓` pijltjes, `⌃` Ctrl, `⇧` Shift en `⌥` Alt voor de volgende toets (`⌃⇧D`).
     pub fn inject(&mut self, raw: &mut egui::RawInput) {
         if self.frames < 2 {
             return;

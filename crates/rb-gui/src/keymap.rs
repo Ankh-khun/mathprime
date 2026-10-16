@@ -28,10 +28,11 @@ pub enum Action {
     Instellingen,
     Zoeken,
     Vervangen,
+    Afdrukvoorbeeld,
 }
 
 impl Action {
-    pub const ALL: [Action; 17] = [
+    pub const ALL: [Action; 18] = [
         Action::Nieuw,
         Action::Openen,
         Action::Opslaan,
@@ -49,6 +50,7 @@ impl Action {
         Action::Instellingen,
         Action::Zoeken,
         Action::Vervangen,
+        Action::Afdrukvoorbeeld,
     ];
 
     /// Naam in het configuratiebestand.
@@ -71,6 +73,7 @@ impl Action {
             Action::Instellingen => "instellingen",
             Action::Zoeken => "zoeken",
             Action::Vervangen => "vervangen",
+            Action::Afdrukvoorbeeld => "afdrukvoorbeeld",
         }
     }
 
@@ -94,6 +97,7 @@ impl Action {
             Action::Instellingen => "Instellingen…",
             Action::Zoeken => "Zoeken…",
             Action::Vervangen => "Vervangen of hernoemen…",
+            Action::Afdrukvoorbeeld => "Afdrukvoorbeeld",
         }
     }
 
@@ -116,6 +120,7 @@ impl Action {
             Action::Instellingen => "Ctrl+Comma",
             Action::Zoeken => "Ctrl+F",
             Action::Vervangen => "Ctrl+H",
+            Action::Afdrukvoorbeeld => "Ctrl+Alt+P",
         }
     }
 }

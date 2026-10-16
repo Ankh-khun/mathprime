@@ -4,7 +4,12 @@
 //! plot x = 0 ; 10 : sin(x), cos(x)            functies van x, 200 punten
 //! plot t = 0 s ; 2 s ; 500 : u(t) = mm        500 punten, y-as in mm
 //! plot vx : vy, vz                            vectoren (meetpunten) tegen elkaar
+//! plot f = 10 ; 1e5 : H(f) | log xy            logaritmische assen (Bode)
+//! plot x = 0 ; 10 : sin(x) | y = -2 ; 2         vaste grenzen van de y-as
 //! ```
+//!
+//! Opties staan na de laatste `|`, gescheiden door komma's: `log x`, `log y`, `log xy`,
+//! `x = a ; b` en `y = a ; b`. Grenzen zonder eenheid gelden in de eenheid van de as.
 //!
 //! De uitkomst ([`PlotData`]) is al in de weergave-eenheden omgerekend, zodat elke weergave
 //! (interface, SVG, PDF) hem direct kan tekenen.
@@ -35,6 +40,16 @@ pub struct PlotSpec {
     pub series: Vec<(Expr, String)>,
     /// Gekozen eenheid voor de y-as: (uitdrukking, tekst).
     pub unit: Option<(Expr, String)>,
+    pub opts: PlotOptions,
+}
+
+/// De opties na `|`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PlotOptions {
+    pub log_x: bool,
+    pub log_y: bool,
+    pub x_range: Option<(Expr, Expr)>,
+    pub y_range: Option<(Expr, Expr)>,
 }
 
 /// Eén lijn in een grafiek.
@@ -52,6 +67,11 @@ pub struct PlotData {
     /// Bijvoorbeeld `[mm]` (leeg voor dimensieloos).
     pub y_label: String,
     pub series: Vec<Series>,
+    pub log_x: bool,
+    pub log_y: bool,
+    /// Vaste grenzen in weergave-eenheden.
+    pub x_range: Option<(f64, f64)>,
+    pub y_range: Option<(f64, f64)>,
 }
 
 impl PlotSpec {
@@ -76,6 +96,10 @@ impl PlotSpec {
         }
         if let Some((u, _)) = &self.unit {
             u.collect_names(&none, &mut out);
+        }
+        for (a, b) in self.opts.x_range.iter().chain(&self.opts.y_range) {
+            a.collect_names(&none, &mut out);
+            b.collect_names(&none, &mut out);
         }
         out
     }
@@ -111,6 +135,47 @@ fn split_top(src: &str, is_sep: impl Fn(&Tok) -> bool) -> Result<Vec<String>, Er
     Ok(parts)
 }
 
+/// Lees de opties na `|`: `log x`, `log y`, `log xy`, `x = a ; b`, `y = a ; b`.
+/// `None` als het geen optielijst is (dan hoort de `|` bij een absolute waarde).
+fn parse_options(src: &str) -> Option<Result<PlotOptions, Error>> {
+    let src = src.trim();
+    if src.is_empty() {
+        return None;
+    }
+    let mut o = PlotOptions::default();
+    for item in src.split(',') {
+        let item = item.trim();
+        if let Some(axes) = item.strip_prefix("log") {
+            let axes = axes.trim();
+            if axes.is_empty() || !axes.chars().all(|c| c == 'x' || c == 'y') {
+                return None;
+            }
+            o.log_x |= axes.contains('x');
+            o.log_y |= axes.contains('y');
+        } else if let Some((axis, range)) = item.split_once('=') {
+            let axis = axis.trim();
+            if axis != "x" && axis != "y" {
+                return None;
+            }
+            let Some((a, b)) = range.split_once(';') else {
+                return Some(Err(perr("plot: een grens schrijf je als 'x = begin ; einde'")));
+            };
+            let r = match (parse_expr_str(a), parse_expr_str(b)) {
+                (Ok(a), Ok(b)) => (a, b),
+                (Err(e), _) | (_, Err(e)) => return Some(Err(e)),
+            };
+            if axis == "x" {
+                o.x_range = Some(r);
+            } else {
+                o.y_range = Some(r);
+            }
+        } else {
+            return None;
+        }
+    }
+    Some(Ok(o))
+}
+
 /// Lees de rest van een regel na `plot `.
 pub fn parse_plot(rest: &str) -> Result<PlotSpec, Error> {
     // kop en reeksen worden gescheiden door de eerste ':' die geen ':=' is
@@ -118,7 +183,15 @@ pub fn parse_plot(rest: &str) -> Result<PlotSpec, Error> {
     let colon = (0..bytes.len())
         .find(|&i| bytes[i] == b':' && bytes.get(i + 1) != Some(&b'='))
         .ok_or_else(|| perr(SYNTAX))?;
-    let (head, body) = (rest[..colon].trim(), rest[colon + 1..].trim());
+    let (head, mut body) = (rest[..colon].trim(), rest[colon + 1..].trim());
+    // opties na de laatste '|', als wat erna staat echt opties zijn
+    let mut opts = PlotOptions::default();
+    if let Some(bar) = body.rfind('|') {
+        if let Some(o) = parse_options(&body[bar + 1..]) {
+            opts = o?;
+            body = body[..bar].trim();
+        }
+    }
     let x = match head.split_once('=') {
         Some((var, ranges)) => {
             let var = var.trim().to_string();
@@ -157,7 +230,7 @@ pub fn parse_plot(rest: &str) -> Result<PlotSpec, Error> {
     if series.is_empty() {
         return Err(perr(SYNTAX));
     }
-    Ok(PlotSpec { x, series, unit })
+    Ok(PlotSpec { x, series, unit, opts })
 }
 
 fn real_vector(v: Value, what: &str) -> Result<Vec<Quantity>, Error> {
@@ -193,7 +266,16 @@ pub fn eval_plot(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
                 return Err(Error::Domain("plot: het aantal punten moet een geheel getal van 2 tot en met 100000 zijn".into()));
             }
             let n = n as usize;
-            let xs: Vec<f64> = (0..n).map(|k| a.value + (b.value - a.value) * k as f64 / (n - 1) as f64).collect();
+            let xs: Vec<f64> = if spec.opts.log_x {
+                // geometrisch verdeeld, zodat elke decade evenveel punten krijgt
+                if !(a.value > 0.0 && b.value > 0.0) {
+                    return Err(Error::Domain("plot: een logaritmische x-as vraagt een begin en einde groter dan 0".into()));
+                }
+                let (la, lb) = (a.value.ln(), b.value.ln());
+                (0..n).map(|k| (la + (lb - la) * k as f64 / (n - 1) as f64).exp()).collect()
+            } else {
+                (0..n).map(|k| a.value + (b.value - a.value) * k as f64 / (n - 1) as f64).collect()
+            };
             let mut env2 = env.clone();
             let mut ys = vec![Vec::with_capacity(n); spec.series.len()];
             for &x in &xs {
@@ -284,6 +366,31 @@ pub fn eval_plot(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
             auto_scale(ymag, ydim)
         }
     };
+    // vaste grenzen: met eenheid omgerekend, zonder eenheid al in weergave-eenheden
+    let range = |r: &Option<(Expr, Expr)>, dim: Dim, div: f64, what: &'static str| -> Result<Option<(f64, f64)>, Error> {
+        let Some((a, b)) = r else { return Ok(None) };
+        let mut ends = [0.0; 2];
+        for (k, e) in [a, b].into_iter().enumerate() {
+            let q = env.eval_expr(e)?.as_quantity(what)?;
+            ends[k] = if q.dim == Dim::NONE && dim != Dim::NONE {
+                q.value
+            } else {
+                q.same_dim(Quantity::new(0.0, dim), what)?;
+                q.value / div
+            };
+        }
+        if !(ends[0] < ends[1]) {
+            return Err(Error::Domain(format!("plot: {what}: het begin moet kleiner zijn dan het einde")));
+        }
+        Ok(Some((ends[0], ends[1])))
+    };
+    let x_range = range(&spec.opts.x_range, xdim, xdiv, "de grenzen van de x-as")?;
+    let y_range = range(&spec.opts.y_range, ydim, ydiv, "de grenzen van de y-as")?;
+    for (log, r, axis) in [(spec.opts.log_x, x_range, "x"), (spec.opts.log_y, y_range, "y")] {
+        if log && r.is_some_and(|(a, _)| a <= 0.0) {
+            return Err(Error::Domain(format!("plot: een logaritmische {axis}-as kan niet bij 0 of lager beginnen")));
+        }
+    }
     let series = spec
         .series
         .iter()
@@ -301,6 +408,10 @@ pub fn eval_plot(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
         x_label: format!("{x_name} {}", label(&xunit)).trim().to_string(),
         y_label: label(&yunit),
         series,
+        log_x: spec.opts.log_x,
+        log_y: spec.opts.log_y,
+        x_range,
+        y_range,
     })
 }
 
@@ -319,6 +430,39 @@ mod tests {
         assert!(matches!(parse_plot("vx : vy").unwrap().x, PlotX::Data(_)));
         assert!(parse_plot("x = 0 : sin(x)").is_err());
         assert!(parse_plot("x = 0 ; 1").is_err());
+    }
+
+    #[test]
+    fn grafiekopties() {
+        let p = parse_plot("f = 10 ; 1e5 : 1 / sqrt(1 + (f / 1000)^2) | log xy").unwrap();
+        assert!(p.opts.log_x && p.opts.log_y && p.series.len() == 1);
+        let p = parse_plot("x = -1 ; 1 : abs(x)").unwrap();
+        assert_eq!(p.opts, PlotOptions::default());
+        let p = parse_plot("x = -1 ; 1 : abs(x) * 2 = 1 | y = 0 ; 3, log x").unwrap();
+        assert_eq!(p.series[0].1, "abs(x) * 2");
+        assert!(p.unit.is_some() && p.opts.y_range.is_some() && p.opts.log_x && !p.opts.log_y);
+        assert!(parse_plot("x = 0 ; 1 : x | y = 0").is_err());
+    }
+
+    #[test]
+    fn bodediagram() {
+        // eerste-orde laagdoorlaatfilter met kantelfrequentie 1 kHz
+        let env = Env::new();
+        let p = parse_plot("f = 10 Hz ; 100 kHz ; 5 : 1 / sqrt(1 + (f / 1 kHz)^2) | log xy, y = 1e-3 ; 2").unwrap();
+        let d = eval_plot(&env, &p).unwrap();
+        assert!(d.log_x && d.log_y);
+        assert_eq!(d.y_range, Some((1e-3, 2.0)));
+        // een punt per decade: steeds dezelfde verhouding
+        let xs: Vec<f64> = d.series[0].points.iter().map(|p| p[0]).collect();
+        let ratio = xs[1] / xs[0];
+        assert!((ratio - 10.0).abs() < 1e-9);
+        assert!(xs.windows(2).all(|w| (w[1] / w[0] - ratio).abs() < 1e-9 * ratio));
+        // bij de kantelfrequentie is de versterking 1/√2
+        let mid = d.series[0].points[2][1];
+        assert!((mid - 1.0 / 2f64.sqrt()).abs() < 1e-12);
+        // logaritmisch vanaf 0 kan niet
+        let p = parse_plot("x = 0 ; 10 : x | log x").unwrap();
+        assert!(eval_plot(&env, &p).unwrap_err().to_string().contains("groter dan 0"));
     }
 
     #[test]

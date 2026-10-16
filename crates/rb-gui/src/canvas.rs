@@ -58,6 +58,8 @@ pub struct Layout {
     pages: Vec<Page>,
     rects: Vec<RegionRect>,
     grid: Grid,
+    /// Gemaakt voor het afdrukvoorbeeld (andere opmaak: vaste grafieken, geen schermtekens).
+    preview: bool,
 }
 
 pub enum Mode {
@@ -163,6 +165,8 @@ pub struct CanvasState {
     pub show_settings: bool,
     /// Donkere modus.
     pub dark: bool,
+    /// Afdrukvoorbeeld: het blad zoals in de PDF, zonder bewerken (Bestand → Afdrukvoorbeeld).
+    pub preview: bool,
     /// De lijst met namen tijdens het typen (automatisch aanvullen).
     complete: Option<Completion>,
 }
@@ -346,11 +350,19 @@ fn split_comment(s: &str) -> (&str, String) {
 
 impl App {
     pub(crate) fn ensure_layout(&mut self) {
-        if self.cv.layout.as_ref().map(|l| l.generation) != Some(self.generation) {
-            let s = setup();
+        let preview = self.cv.preview;
+        if self.cv.layout.as_ref().map(|l| (l.generation, l.preview)) != Some((self.generation, preview)) {
+            // in het afdrukvoorbeeld dezelfde opmaak als de PDF (vaste grafieken, geen schermtekens)
+            let s = if preview { Setup { static_plots: true, ..Setup::a4() } } else { setup() };
             let (pages, rects, grid) = layout_full(&self.sheet, &s);
-            self.cv.layout = Some(Layout { generation: self.generation, pages, rects, grid });
+            self.cv.layout = Some(Layout { generation: self.generation, pages, rects, grid, preview });
         }
+    }
+
+    /// Het aantal pagina's van het blad (zoals nu opgemaakt).
+    pub(crate) fn page_count(&mut self) -> usize {
+        self.ensure_layout();
+        self.lay().pages.len()
     }
 
     fn lay(&self) -> &Layout {
@@ -981,6 +993,13 @@ impl App {
     /// Toetsen voor het werkblad. Wordt vóór de sneltoetsen van het menu aangeroepen; wat hier
     /// gebruikt wordt, verdwijnt uit de invoer.
     pub(crate) fn canvas_keys(&mut self, ctx: &egui::Context) {
+        if self.cv.preview {
+            // alleen Esc: terug naar bewerken
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, EKey::Escape)) {
+                self.cv.preview = false;
+            }
+            return;
+        }
         if let Some(Edit { mode: Mode::Table(t), .. }) = &mut self.cv.edit {
             // in een tabel: Enter een rij lager (onderaan komt er een rij bij), Esc rondt af
             let focused = ctx.memory(|m| m.focused());
@@ -1137,13 +1156,17 @@ impl App {
         self.ensure_layout();
         self.paint(ui, &geo, npages, &resp);
         // een leeg blad: aanwijzing en recente bestanden op de eerste pagina
-        if self.sheet.regions().is_empty() && self.cv.edit.is_none() {
+        if self.sheet.regions().is_empty() && self.cv.edit.is_none() && !self.cv.preview {
             let center = geo.page_origin(0) + Vec2::new(page_w / 2.0, 240.0) * zoom;
             self.empty_state(ui, center);
         }
     }
 
     fn mouse(&mut self, ui: &egui::Ui, resp: &egui::Response, geo: &Geo) {
+        // het afdrukvoorbeeld is alleen om te bekijken
+        if self.cv.preview {
+            return;
+        }
         let press = ui.input(|i| i.pointer.press_origin());
         let latest = ui.input(|i| i.pointer.latest_pos());
         let editing = self.cv.edit.as_ref().and_then(|e| e.region);
@@ -1248,7 +1271,7 @@ impl App {
                 painter.rect_filled(r.translate(Vec2::new(0.0, 2.0)).expand(grow), 4.0, Color32::from_black_alpha(shade * k2 / 2));
             }
             painter.rect_filled(r, 2.0, tone(Color32::WHITE));
-            if r.intersects(ui.clip_rect()) {
+            if r.intersects(ui.clip_rect()) && !self.cv.preview {
                 paint_background(&painter, self.cv.set.background, geo, k, self.cv.dark);
             }
         }
@@ -1259,7 +1282,7 @@ impl App {
             }
         }
         if self.cv.drag.is_none() {
-            if let Some(h) = resp.hover_pos().and_then(|p| self.region_at(geo, p)) {
+            if let Some(h) = resp.hover_pos().filter(|_| !self.cv.preview).and_then(|p| self.region_at(geo, p)) {
                 if let Some(q) = l.rects.iter().find(|q| q.region == h) {
                     painter.rect_stroke(geo.rect(q).expand(3.0), 2.0, Stroke::new(1.0, tone(Color32::from_rgb(190, 196, 210))), StrokeKind::Middle);
                 }
@@ -1288,7 +1311,7 @@ impl App {
             painter.rect_stroke(r, 0.0, Stroke::new(1.0, tone(BLUE)), StrokeKind::Middle);
         }
         // het kruisje
-        if let (Some((c, r)), None) = (self.cv.cross, &self.cv.edit) {
+        if let (Some((c, r)), None, false) = (self.cv.cross, &self.cv.edit, self.cv.preview) {
             let (x, y) = geo.grid.point(c, r);
             let p = geo.screen(x, y + 0.5 * ROW_H);
             let red = Stroke::new(1.5, tone(Color32::from_rgb(220, 30, 30)));

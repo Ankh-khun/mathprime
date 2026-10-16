@@ -24,7 +24,16 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.3)
+## 2. Wat er nu staat (v1.4)
+
+**Nieuw in v1.4.** Afdrukvoorbeeld (Ctrl+Alt+P, `cv.preview` in `canvas.rs`): de layout met
+`Setup { static_plots: true }`, dezelfde als voor de PDF; de layoutcache houdt rekening met de stand; bewerken,
+kruis en aanwijzen staan uit, Esc gaat terug. Grafiekopties na de laatste `|` (`plot.rs::parse_options`):
+`log x`/`log y`/`log xy` en `x = a ; b`/`y = a ; b`. Bij een logaritmische x-as worden de punten geometrisch
+verdeeld; de weergaven tekenen log10 van de waarden met strepen op 1..9 × 10^k (`doc.rs::log_ticks`, ook als
+egui_plot-gridspacer) en labels op de machten van 10. Vaste grenzen zijn in de interface de begin- en
+resetgrenzen (zoomen kan nog), in de PDF wordt wat erbuiten valt afgeknipt (`clip`, Liang–Barsky). Sneltoetsen met
+meer modifiers worden eerst gecontroleerd, want egui laat Ctrl+P ook bij Ctrl+Alt+P afgaan.
 
 **Nieuw in v1.3.** Eén venster (`rb-gui/src/instance.rs`): het eerste venster luistert op 127.0.0.1 (poort en
 sleutel in `instance.txt`); een tweede start geeft het bestand door en stopt; bij het naar voren halen geeft het
@@ -330,8 +339,8 @@ getekend), export naar PDF en SVG (ook vanaf de command-line: `mathprime-cli exp
 configuratiebestand. De regioposities (`@kolom,rij`) bepalen ook in de weergave wat naast elkaar staat.
 
 Wat doorschuift: regio's met de muis verslepen (posities bestaan, slepen nog niet), 3D-, pool- en
-logaritmische grafieken en instelbare asgrenzen, direct afdrukken (nu via PDF), een paginaweergave in de
-interface, en bewerken in de opgemaakte formule zelf (fase 4).
+logaritmische grafieken en instelbare asgrenzen (gedaan in v1.4), direct afdrukken (nu via PDF), een
+paginaweergave in de interface (het afdrukvoorbeeld van v1.4), en bewerken in de opgemaakte formule zelf (fase 4).
 
 **Fase 4 — structuurgebaseerde formule-editor (XL).** Cursor die door breuken, machten en wortels loopt zoals
 Prime, selectie uitbreiden met de spatiebalk, invoegen rond de selectie. Navigatie is gedocumenteerd

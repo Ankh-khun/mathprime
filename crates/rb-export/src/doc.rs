@@ -292,12 +292,100 @@ pub fn nice_ticks(lo: f64, hi: f64, target: usize) -> Vec<f64> {
         .collect()
 }
 
+/// Schaalverdeling van een logaritmische as, in log10-waarden tussen `lo` en `hi`: (waarde, hoofdstreep).
+/// Hoofdstrepen op elke macht van 10, tussenstrepen op 2..9 × 10^k (bij veel decaden weggelaten).
+pub fn log_ticks(lo: f64, hi: f64) -> Vec<(f64, bool)> {
+    if !(lo.is_finite() && hi.is_finite()) || hi <= lo {
+        return Vec::new();
+    }
+    let (k0, k1) = (lo.floor() as i64, hi.ceil() as i64);
+    // te veel decaden: alleen elke n-de macht
+    let every = ((k1 - k0) / 10 + 1).max(1);
+    let minor = k1 - k0 <= 8;
+    let mut out = Vec::new();
+    for k in k0..=k1 {
+        if k % every == 0 && (lo - 1e-9..=hi + 1e-9).contains(&(k as f64)) {
+            out.push((k as f64, true));
+        }
+        if minor {
+            for m in 2..=9 {
+                let v = k as f64 + (m as f64).log10();
+                if (lo..=hi).contains(&v) {
+                    out.push((v, false));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Een polylijn afknippen op het kader `[x0, x1] × [y0, y1]` (Liang–Barsky per stuk).
+fn clip(points: &[[f64; 2]], x0: f64, x1: f64, y0: f64, y1: f64) -> Vec<Vec<[f64; 2]>> {
+    let inside = |q: [f64; 2]| (x0..=x1).contains(&q[0]) && (y0..=y1).contains(&q[1]);
+    if points.len() == 1 {
+        return if inside(points[0]) { vec![points.to_vec()] } else { Vec::new() };
+    }
+    let mut out: Vec<Vec<[f64; 2]>> = Vec::new();
+    let mut cur: Vec<[f64; 2]> = Vec::new();
+    for w in points.windows(2) {
+        let (a, b) = (w[0], w[1]);
+        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+        let (mut t0, mut t1) = (0.0f64, 1.0f64);
+        let mut keep = true;
+        for (p, q) in [(-dx, a[0] - x0), (dx, x1 - a[0]), (-dy, a[1] - y0), (dy, y1 - a[1])] {
+            if p == 0.0 {
+                keep &= q >= 0.0;
+            } else if p < 0.0 {
+                t0 = t0.max(q / p);
+            } else {
+                t1 = t1.min(q / p);
+            }
+        }
+        if !keep || t0 > t1 {
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            continue;
+        }
+        let pa = [a[0] + t0 * dx, a[1] + t0 * dy];
+        let pb = [a[0] + t1 * dx, a[1] + t1 * dy];
+        if cur.last() != Some(&pa) {
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur));
+            }
+            cur.push(pa);
+        }
+        cur.push(pb);
+        if t1 < 1.0 {
+            out.push(std::mem::take(&mut cur));
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// Een waarde naar de as: log10 bij een logaritmische as (0 en negatief worden NaN).
+pub fn axis_value(v: f64, log: bool) -> f64 {
+    if !log {
+        v
+    } else if v > 0.0 {
+        v.log10()
+    } else {
+        f64::NAN
+    }
+}
+
 /// Teken een grafiek in een kader van `w` × `h` (linksboven op 0, 0).
 pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
     let mut ops = Vec::new();
     let (left, right, top, bottom) = (52.0, 12.0, 14.0, 30.0);
     let (px, py, pw, ph) = (left, top, w - left - right, h - top - bottom);
-    let pts: Vec<[f64; 2]> = p.series.iter().flat_map(|s| s.points.iter().copied()).filter(|q| q[0].is_finite() && q[1].is_finite()).collect();
+    // punten op de assen (log10 bij een logaritmische as)
+    let tf = |q: &[f64; 2]| [axis_value(q[0], p.log_x), axis_value(q[1], p.log_y)];
+    let series: Vec<Vec<[f64; 2]>> = p.series.iter().map(|s| s.points.iter().map(tf).collect()).collect();
+    let pts: Vec<[f64; 2]> = series.iter().flatten().copied().filter(|q| q[0].is_finite() && q[1].is_finite()).collect();
     let range = |k: usize| {
         let lo = pts.iter().map(|q| q[k]).fold(f64::INFINITY, f64::min);
         let hi = pts.iter().map(|q| q[k]).fold(f64::NEG_INFINITY, f64::max);
@@ -309,43 +397,63 @@ pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
             (lo, hi)
         }
     };
-    let ((x0, x1), (y0, y1)) = (range(0), range(1));
-    // marge van 5% boven en onder
-    let pad = 0.05 * (y1 - y0);
-    let (y0, y1) = (y0 - pad, y1 + pad);
+    // vaste grenzen gaan voor; anders de data, met 5% marge boven en onder
+    let fixed = |r: Option<(f64, f64)>, log: bool| r.map(|(a, b)| (axis_value(a, log), axis_value(b, log))).filter(|(a, b)| a < b);
+    let (x0, x1) = fixed(p.x_range, p.log_x).unwrap_or_else(|| range(0));
+    let (y0, y1) = fixed(p.y_range, p.log_y).unwrap_or_else(|| {
+        let (y0, y1) = range(1);
+        let pad = 0.05 * (y1 - y0);
+        (y0 - pad, y1 + pad)
+    });
     let sx = |x: f64| px + ((x - x0) / (x1 - x0)) as f32 * pw;
     let sy = |y: f64| py + ph - ((y - y0) / (y1 - y0)) as f32 * ph;
     let small = 0.8 * size;
-    for t in nice_ticks(x0, x1, 6) {
+    // (waarde op de as, label); een leeg label is een tussenstreep
+    let ticks = |lo: f64, hi: f64, log: bool, n: usize| -> Vec<(f64, String)> {
+        if log {
+            let t = log_ticks(lo, hi);
+            // minder dan twee machten van 10 in beeld: ook 2 en 5 benoemen
+            let few = t.iter().filter(|(_, major)| *major).count() < 2;
+            t.into_iter()
+                .map(|(v, major)| {
+                    let m = 10f64.powf(v - v.floor()).round();
+                    let named = major || (few && (m == 2.0 || m == 5.0));
+                    (v, if named { format_number(10f64.powf(v)) } else { String::new() })
+                })
+                .collect()
+        } else {
+            nice_ticks(lo, hi, n).into_iter().map(|t| (t, format_number(t))).collect()
+        }
+    };
+    for (t, label) in ticks(x0, x1, p.log_x, 6) {
         let x = sx(t);
-        ops.push(Op::Line { x1: x, y1: py, x2: x, y2: py + ph, width: 0.5, color: LIGHT });
-        let label = format_number(t);
+        let color = if label.is_empty() { Color(238, 238, 238) } else { LIGHT };
+        ops.push(Op::Line { x1: x, y1: py, x2: x, y2: py + ph, width: 0.5, color });
         let lw = fonts().width(&label, small, FontId::Main);
         ops.push(Op::Text { x: x - lw / 2.0, y: py + ph + small + 3.0, size: small, text: label, font: FontId::Main, color: GREY });
     }
-    for t in nice_ticks(y0, y1, 5) {
+    for (t, label) in ticks(y0, y1, p.log_y, 5) {
         let y = sy(t);
-        ops.push(Op::Line { x1: px, y1: y, x2: px + pw, y2: y, width: 0.5, color: LIGHT });
-        let label = format_number(t);
+        let color = if label.is_empty() { Color(238, 238, 238) } else { LIGHT };
+        ops.push(Op::Line { x1: px, y1: y, x2: px + pw, y2: y, width: 0.5, color });
         let lw = fonts().width(&label, small, FontId::Main);
         ops.push(Op::Text { x: px - lw - 4.0, y: y + small * 0.35, size: small, text: label, font: FontId::Main, color: GREY });
     }
+    ops.retain(|o| !matches!(o, Op::Text { text, .. } if text.is_empty()));
     ops.push(Op::Rect { x: px, y: py, w: pw, h: ph, width: 0.8, color: GREY });
-    for (k, s) in p.series.iter().enumerate() {
+    for (k, s) in series.iter().enumerate() {
         let color = SERIES[k % SERIES.len()];
-        let mut seg: Vec<(f32, f32)> = Vec::new();
-        for q in &s.points {
-            if q[0].is_finite() && q[1].is_finite() {
-                seg.push((sx(q[0]), sy(q[1])));
-            } else if !seg.is_empty() {
-                ops.push(Op::Poly { points: std::mem::take(&mut seg), width: 1.3, color });
+        // een NaN onderbreekt de lijn; wat buiten de grenzen valt wordt afgeknipt
+        for run in s.split(|q| !q[0].is_finite() || !q[1].is_finite()).filter(|r| !r.is_empty()) {
+            for seg in clip(run, x0, x1, y0, y1) {
+                let seg: Vec<(f32, f32)> = seg.iter().map(|q| (sx(q[0]), sy(q[1]))).collect();
+                if run.len() == 1 {
+                    let (x, y) = seg[0];
+                    ops.push(Op::Rect { x: x - 1.5, y: y - 1.5, w: 3.0, h: 3.0, width: 1.0, color });
+                } else {
+                    ops.push(Op::Poly { points: seg, width: 1.3, color });
+                }
             }
-        }
-        if seg.len() == 1 {
-            let (x, y) = seg[0];
-            ops.push(Op::Rect { x: x - 1.5, y: y - 1.5, w: 3.0, h: 3.0, width: 1.0, color });
-        } else if !seg.is_empty() {
-            ops.push(Op::Poly { points: seg, width: 1.3, color });
         }
     }
     // aslabels en legenda
@@ -711,6 +819,31 @@ mod tests {
         let t = nice_ticks(0.0, 7.3, 5);
         assert_eq!(t.first(), Some(&0.0));
         assert!(t.len() >= 4);
+    }
+
+    #[test]
+    fn logaritmische_schaal() {
+        // 10 .. 100000: vijf machten van 10, met tussenstrepen
+        let t = log_ticks(1.0, 5.0);
+        let major: Vec<f64> = t.iter().filter(|(_, m)| *m).map(|(v, _)| *v).collect();
+        assert_eq!(major, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+        assert!(t.iter().any(|(v, m)| !m && (v - (1.0 + 2f64.log10())).abs() < 1e-12));
+        // veel decaden: geen tussenstrepen en niet elke macht
+        let t = log_ticks(-20.0, 20.0);
+        assert!(t.iter().all(|(_, m)| *m) && t.len() < 20);
+        assert_eq!(axis_value(100.0, true), 2.0);
+        assert!(axis_value(0.0, true).is_nan() && axis_value(-1.0, false) == -1.0);
+    }
+
+    #[test]
+    fn afknippen() {
+        // een lijn van (-1, 0) naar (2, 3) binnen [0, 1] × [0, 10]: van (0, 1) tot (1, 2)
+        let s = clip(&[[-1.0, 0.0], [2.0, 3.0]], 0.0, 1.0, 0.0, 10.0);
+        assert_eq!(s, vec![vec![[0.0, 1.0], [1.0, 2.0]]]);
+        // uit beeld en weer terug: twee stukken
+        let s = clip(&[[0.0, 0.0], [1.0, 5.0], [2.0, 0.0]], 0.0, 2.0, 0.0, 2.5);
+        assert_eq!(s.len(), 2);
+        assert!(clip(&[[5.0, 5.0]], 0.0, 1.0, 0.0, 1.0).is_empty());
     }
 
     #[test]

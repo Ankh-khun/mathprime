@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.3 — één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.4 — afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -106,6 +106,9 @@ bij de volgende start of die terug moeten. **Ctrl+F** zoekt in het blad (Enter: 
 **Ctrl+H** vervangt; met "Hele namen" hernoem je een variabele overal waar hij gebruikt wordt, maar
 niet in stukjes van andere namen of waar dezelfde letters een eenheid zijn (de `L` van liter boven
 de definitie van een variabele `L`).
+
+**Ctrl+Alt+P** (Bestand → Afdrukvoorbeeld) toont het blad precies zoals het in de PDF komt: pagina's,
+kop- en voetteksten en grafieken als vaste afbeelding. Esc gaat terug naar bewerken.
 
 Meerdere werkbladen staan in tabbladen onder het lint, zoals in Prime. Openen (of een bestand naar
 het venster slepen) opent een nieuw tabblad; is het huidige blad nog leeg, dan komt het daar. Een
@@ -226,6 +229,8 @@ sweep hh = 80 mm ; 160 mm ; 5 : 6 * M.max / (b * hh^2) = MPa    parametersweep, 
 plot x = 0 m ; L : w(x), v(x) = mm    grafiek van functies (200 punten), y-as in mm
 plot t = 0 s ; 2 s ; 500 : u(t)       met een gekozen aantal punten
 plot x.m : F.m                        meetpunten (twee vectoren)
+plot f = 10 Hz ; 100 kHz : abs(H(f)) | log xy    logaritmische assen (Bodediagram)
+plot x = 0 ; 10 : sin(x) | y = -1 ; 1, x = 2 ; 8  vaste asgrenzen (zonder eenheid: in die van de as)
 @40,3 b := 2 m             regio op kolom 40, rij 3 (volgorde: rij, dan kolom)
 ```
 

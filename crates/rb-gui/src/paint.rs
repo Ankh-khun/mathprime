@@ -119,31 +119,82 @@ fn texture(ctx: &egui::Context, png: &[u8], hash: u64) -> Option<egui::TextureHa
 
 /// Een interactieve grafiek (zoomen, verschuiven, waarden aflezen) in `rect`.
 pub fn plot(ui: &mut egui::Ui, id: usize, rect: Rect, data: &PlotData) {
+    use rb_export::doc::{axis_value, log_ticks};
+    let (lx, ly) = (data.log_x, data.log_y);
+    // een andere as-instelling is een nieuwe grafiek, zodat egui geen oude grenzen onthoudt
+    let bits = |r: Option<(f64, f64)>| r.map(|(a, b)| (a.to_bits(), b.to_bits()));
+    let key = ("grafiek", id, lx, ly, bits(data.x_range), bits(data.y_range));
+    let mut plot = egui_plot::Plot::new(key)
+        .width(rect.width())
+        .height(rect.height())
+        .x_axis_label(data.x_label.clone())
+        .y_axis_label(data.y_label.clone())
+        .legend(egui_plot::Legend::default())
+        .allow_scroll(false);
+    // logaritmische as: we tekenen log10 van de waarden, met strepen op 1, 2 .. 9 × 10^k
+    // en labels op de machten van 10
+    let spacer = |input: egui_plot::GridInput| {
+        log_ticks(input.bounds.0, input.bounds.1)
+            .into_iter()
+            .map(|(value, major)| egui_plot::GridMark { value, step_size: if major { 1.0 } else { 0.1 } })
+            .collect()
+    };
+    let decade = |m: egui_plot::GridMark, _: &std::ops::RangeInclusive<f64>| {
+        if (m.value - m.value.round()).abs() < 1e-9 {
+            rb_units::format_number(10f64.powf(m.value.round()))
+        } else {
+            String::new()
+        }
+    };
+    if lx {
+        plot = plot.x_grid_spacer(spacer).x_axis_formatter(decade);
+    }
+    if ly {
+        plot = plot.y_grid_spacer(spacer).y_axis_formatter(decade);
+    }
+    if lx || ly {
+        let back = move |v: f64, log: bool| rb_units::format_number(if log { 10f64.powf(v) } else { v });
+        plot = plot.label_formatter(move |pos| {
+            Some(match pos {
+                egui_plot::HoverPosition::NearDataPoint { plot_name, position, .. } => {
+                    format!("{plot_name}\nx = {}\ny = {}", back(position.x, lx), back(position.y, ly))
+                }
+                egui_plot::HoverPosition::Elsewhere { position } => format!("x = {}\ny = {}", back(position.x, lx), back(position.y, ly)),
+            })
+        });
+    }
+    // vaste grenzen: begin- en resetgrenzen (in- en uitzoomen blijft kan, dubbelklik zet terug)
+    if let Some((a, b)) = data.x_range {
+        let (a, b) = (axis_value(a, lx), axis_value(b, lx));
+        if a < b {
+            plot = plot.default_x_bounds(a, b);
+        }
+    }
+    if let Some((a, b)) = data.y_range {
+        let (a, b) = (axis_value(a, ly), axis_value(b, ly));
+        if a < b {
+            plot = plot.default_y_bounds(a, b);
+        }
+    }
     ui.put(rect, |ui: &mut egui::Ui| {
-        egui_plot::Plot::new(("grafiek", id))
-            .width(rect.width())
-            .height(rect.height())
-            .x_axis_label(data.x_label.clone())
-            .y_axis_label(data.y_label.clone())
-            .legend(egui_plot::Legend::default())
-            .allow_scroll(false)
-            .show(ui, |pui| {
-                for (k, s) in data.series.iter().enumerate() {
-                    let c = color(SERIES[k % SERIES.len()]);
-                    // een NaN (niet uit te rekenen punt) onderbreekt de lijn
-                    for seg in s.points.split(|q| !q[0].is_finite() || !q[1].is_finite()) {
-                        if seg.is_empty() {
-                            continue;
-                        }
-                        let pts: egui_plot::PlotPoints = seg.to_vec().into();
-                        if seg.len() == 1 {
-                            pui.points(egui_plot::Points::new(s.label.clone(), pts).color(c).radius(2.5));
-                        } else {
-                            pui.line(egui_plot::Line::new(s.label.clone(), pts).color(c).width(1.6));
-                        }
+        plot.show(ui, |pui| {
+            for (k, s) in data.series.iter().enumerate() {
+                let c = color(SERIES[k % SERIES.len()]);
+                let pts: Vec<[f64; 2]> = s.points.iter().map(|q| [axis_value(q[0], lx), axis_value(q[1], ly)]).collect();
+                // een NaN (niet uit te rekenen punt, of 0 op een logaritmische as) onderbreekt de lijn
+                for seg in pts.split(|q| !q[0].is_finite() || !q[1].is_finite()) {
+                    if seg.is_empty() {
+                        continue;
+                    }
+                    let pts: egui_plot::PlotPoints = seg.to_vec().into();
+                    if seg.len() == 1 {
+                        pui.points(egui_plot::Points::new(s.label.clone(), pts).color(c).radius(2.5));
+                    } else {
+                        pui.line(egui_plot::Line::new(s.label.clone(), pts).color(c).width(1.6));
                     }
                 }
-            })
-            .response
+            }
+        })
+        .response
     });
 }

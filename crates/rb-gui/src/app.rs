@@ -326,6 +326,10 @@ impl App {
             Action::Instellingen => self.cv.show_settings = true,
             Action::Zoeken => self.open_find(false),
             Action::Vervangen => self.open_find(true),
+            Action::Afdrukvoorbeeld => {
+                self.commit(false);
+                self.cv.preview = !self.cv.preview;
+            }
         }
     }
 
@@ -370,7 +374,13 @@ impl App {
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
         let mut fired = Vec::new();
-        for (action, sc) in &self.keymap.binds {
+        // eerst de sneltoetsen met de meeste modifiers: egui laat Ctrl+P ook bij Ctrl+Alt+P afgaan
+        let mut binds: Vec<_> = self.keymap.binds.iter().collect();
+        binds.sort_by_key(|(_, sc)| {
+            let m = sc.modifiers;
+            std::cmp::Reverse(m.alt as u8 + m.shift as u8 + m.ctrl as u8 + m.command as u8)
+        });
+        for (action, sc) in binds {
             if ctx.input_mut(|i| i.consume_shortcut(sc)) {
                 fired.push(*action);
             }
@@ -400,6 +410,7 @@ impl App {
                 Action::Welkomstblad => i::BOOK,
                 Action::Instellingen => i::SETTINGS,
                 Action::Zoeken | Action::Vervangen => i::SEARCH,
+                Action::Afdrukvoorbeeld => i::PDF,
             };
             let mut b = egui::Button::new(format!("{icon}   {}", a.label()));
             if let Some(sc) = km.shortcut(a) {
@@ -420,7 +431,7 @@ impl App {
                     self.export_mcdx();
                 }
                 ui.separator();
-                for a in [Action::ExportPdf, Action::ExportSvg] {
+                for a in [Action::Afdrukvoorbeeld, Action::ExportPdf, Action::ExportSvg] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
                 ui.separator();
@@ -744,6 +755,21 @@ impl eframe::App for App {
             .show(ui, |ui| self.tab_bar(ctx, ui));
         if self.find.is_some() {
             egui::Panel::top("zoeken").show(ui, |ui| self.find_bar(ui));
+        }
+        if self.cv.preview {
+            egui::Panel::top("afdrukvoorbeeld").show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let pages = self.page_count();
+                    ui.label(RichText::new(format!("{}  Afdrukvoorbeeld", crate::icons::PDF)).strong());
+                    ui.label(RichText::new(format!("{pages} {} · zo komt het in de PDF", if pages == 1 { "pagina" } else { "pagina's" })).weak());
+                    if ui.button(format!("{}  PDF maken…", crate::icons::PDF)).clicked() {
+                        self.run(ctx, Action::ExportPdf);
+                    }
+                    if ui.button("Terug naar bewerken (Esc)").clicked() {
+                        self.cv.preview = false;
+                    }
+                });
+            });
         }
         egui::Panel::bottom("status").show(ui, |ui| {
             ui.horizontal(|ui| {

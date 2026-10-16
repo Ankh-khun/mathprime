@@ -45,7 +45,7 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `odesolve` (één functie, willekeurige orde, beginwaardeprobleem) | v0.3 |
 | Signaalverwerking | `fft ifft cfft icfft` (elke lengte; numpy-normering, zie `PLAN.md` §3) | v0.3 |
 | Werkblad | definities, functies, resultaten, tekst, koppen, sweeps, posities `@kolom,rij`, afhankelijkheidsgraaf, meerregelige blokken, solve blocks | v0.1, posities v0.2, blokken v0.3 |
-| Grafieken (2D) | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface | v0.4 |
+| Grafieken (2D) | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface; logaritmische assen en vaste asgrenzen (`\| log xy, y = a ; b`) | v0.4, v1.4 |
 | Formuleweergave | breuken, machten, indices, wortels, haken, matrices, Σ/∏/∫, d/dx, programmablokken, eenheden in resultaten | v0.4 |
 | Export | PDF (A4, ingebedde lettertypen) en SVG, ook via `mathprime-cli export` | v0.4 |
 | Tekst | strings als waarde; `concat strlen substr search num2str str2num str2vec vec2str IsString error` | v0.8 |
@@ -61,7 +61,7 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Data-analyse (rest) | `regress`, `loess`, lokaal minimum/maximum, uitschieters en NaN, PCA (`Nipals`), smoothing | L | 2+ | PTC-help |
 | Design of Experiments | ontwerpmatrices, factor screening, ANOVA, regressie, Monte Carlo | L | 2+ | PTC-help |
 | Financieel | contante waarde, toekomstige waarde, rente, betaling, intern rendement | S–M | 2+ | PTC-help |
-| Grafieken (rest) | 3D-plots, poolgrafieken, logaritmische assen, asgrenzen instellen, `CreateSpace`/`CreateMesh` | L | 3+ | PTC-help (Graphing) |
+| Grafieken (rest) | 3D-plots, poolgrafieken, `CreateSpace`/`CreateMesh` | L | 3+ | PTC-help (Graphing) |
 | Beeldverwerking | kleur, binarisatie, convolutie, morfologie, transformaties | L | 5+ | PTC-help; waarschijnlijk laag prioriteit |
 
 ## Interface en bediening
