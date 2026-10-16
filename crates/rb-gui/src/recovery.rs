@@ -10,6 +10,7 @@ use crate::app::App;
 use eframe::egui::{self, RichText};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+use crate::taal::t;
 
 /// Hoe vaak er bewaard wordt.
 const INTERVAL: Duration = Duration::from_secs(60);
@@ -119,7 +120,7 @@ impl App {
         egui::Modal::new(egui::Id::new("herstellen")).show(ctx, |ui| {
             ui.set_max_width(420.0);
             ui.heading(format!("{}  Niet-opgeslagen werk gevonden", crate::icons::REFRESH));
-            ui.label("MathPrime is de vorige keer niet netjes afgesloten. Deze bladen hadden wijzigingen die nog niet waren opgeslagen:");
+            ui.label(t("MathPrime is de vorige keer niet netjes afgesloten. Deze bladen hadden wijzigingen die nog niet waren opgeslagen:"));
             ui.add_space(6.0);
             for f in &found {
                 let wanneer = f.path.as_ref().map_or("nieuw blad".to_string(), |p| p.display().to_string());
@@ -128,10 +129,10 @@ impl App {
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.button(RichText::new("Herstellen").strong()).clicked() {
+                if ui.button(RichText::new(t("Herstellen")).strong()).clicked() {
                     choice = Some(true);
                 }
-                if ui.button("Weggooien").clicked() {
+                if ui.button(t("Weggooien")).clicked() {
                     choice = Some(false);
                 }
             });

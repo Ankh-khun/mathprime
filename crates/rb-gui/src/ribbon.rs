@@ -9,6 +9,7 @@ use eframe::egui::{self, RichText};
 use rb_edit::keys::Sheet as S;
 use rb_edit::tree::Op;
 use rb_edit::{Cmd, Template as T};
+use crate::taal::t as tr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
@@ -383,7 +384,7 @@ impl App {
             ui.spacing_mut().item_spacing.x = 18.0;
             ui.add_space(4.0);
             for tab in Tab::ALL {
-                if icons::underline_tab(ui, tab.label(), self.tab == tab).clicked() {
+                if icons::underline_tab(ui, tr(tab.label()), self.tab == tab).clicked() {
                     self.tab = tab;
                 }
             }
@@ -405,11 +406,11 @@ impl App {
                     // knoppen met een pictogram of een bekend symbool groot, met een opschrift;
                     // lange lijsten (functies, eenheden, Griekse letters) compact in rijen
                     let big = buttons.iter().all(|(label, ..)| look(label).is_some());
-                    icons::ribbon_group(ui, title, |ui| {
+                    icons::ribbon_group(ui, tr(title), |ui| {
                         if big {
                             for (label, tip, ins) in &buttons {
                                 let (top, caption) = look(label).unwrap_or_default();
-                                if icons::ribbon_button(ui, &top, &caption, false).on_hover_text(*tip).clicked() {
+                                if icons::ribbon_button(ui, &top, tr(&caption), false).on_hover_text(tr(tip)).clicked() {
                                     chosen = Some(ins.clone());
                                 }
                             }
@@ -418,7 +419,7 @@ impl App {
                                 for chunk in buttons.chunks(10) {
                                     ui.horizontal(|ui| {
                                         for (label, tip, ins) in chunk {
-                                            if ui.add(egui::Button::new(RichText::new(*label).size(14.0)).frame_when_inactive(false)).on_hover_text(*tip).clicked() {
+                                            if ui.add(egui::Button::new(RichText::new(*label).size(14.0)).frame_when_inactive(false)).on_hover_text(tr(tip)).clicked() {
                                                 chosen = Some(ins.clone());
                                             }
                                         }
@@ -438,21 +439,21 @@ impl App {
     /// Bibliotheek en omwerken: de grootheden van de formule waar je in staat.
     fn formula_group(&mut self, ui: &mut egui::Ui, chosen: &mut Option<Ins>) {
         let vars = self.current_equation().map(|(l, r)| rb_core::solve::unknowns(&l, &r)).unwrap_or_default();
-        icons::ribbon_group(ui, "Formules", |ui| {
-            if icons::ribbon_button(ui, &icons::BOOK.to_string(), "Bibliotheek", self.lib.show)
-                .on_hover_text("Bibliotheek met formules (en je eigen formules)")
+        icons::ribbon_group(ui, tr("Formules"), |ui| {
+            if icons::ribbon_button(ui, &icons::BOOK.to_string(), tr("Bibliotheek"), self.lib.show)
+                .on_hover_text(tr("Bibliotheek met formules (en je eigen formules)"))
                 .clicked()
             {
                 *chosen = Some(Ins::Library);
             }
-            let resp = icons::ribbon_button(ui, &icons::REFRESH.to_string(), "Omwerken ▾", false).on_hover_text(if vars.is_empty() {
+            let resp = icons::ribbon_button(ui, &icons::REFRESH.to_string(), tr("Omwerken ▾"), false).on_hover_text(if vars.is_empty() {
                 "Klik eerst op een formule, zoals F == m * a of F := m * a"
             } else {
                 "De formule waar je in staat oplossen naar een andere grootheid"
             });
             egui::Popup::menu(&resp).show(|ui| {
                 if vars.is_empty() {
-                    ui.label(RichText::new("Klik eerst op een formule").weak());
+                    ui.label(RichText::new(tr("Klik eerst op een formule")).weak());
                 }
                 for v in &vars {
                     if ui.button(v).clicked() {
@@ -466,7 +467,7 @@ impl App {
 
     fn document_tab(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         use crate::settings::Thema;
-        icons::ribbon_group(ui, "Thema", |ui| {
+        icons::ribbon_group(ui, tr("Thema"), |ui| {
             for (t, icon, label) in [(Thema::Licht, icons::SUN, "Licht"), (Thema::Donker, icons::MOON, "Donker"), (Thema::Systeem, icons::DESKTOP, "Windows")] {
                 if icons::ribbon_button(ui, &icon.to_string(), label, self.cv.set.thema == t).clicked() {
                     self.cv.set.thema = t;
@@ -475,7 +476,7 @@ impl App {
                 }
             }
         });
-        icons::ribbon_group(ui, "Achtergrond van de pagina", |ui| {
+        icons::ribbon_group(ui, tr("Achtergrond van de pagina"), |ui| {
             for b in Background::ALL {
                 let icon = match b {
                     Background::Leeg => icons::EMPTY,
@@ -483,23 +484,23 @@ impl App {
                     Background::Ruitjes => icons::GRID,
                     Background::Lijnen => icons::LINES,
                 };
-                if icons::ribbon_button(ui, &icon.to_string(), b.label(), self.cv.set.background == b).clicked() {
+                if icons::ribbon_button(ui, &icon.to_string(), tr(b.label()), self.cv.set.background == b).clicked() {
                     self.cv.set.background = b;
                     self.save_settings();
                 }
             }
         });
-        icons::ribbon_group(ui, "Uitvoer", |ui| {
-            if icons::ribbon_button(ui, &icons::PDF.to_string(), "PDF", false).on_hover_text("Exporteren naar PDF (Ctrl+P)").clicked() {
+        icons::ribbon_group(ui, tr("Uitvoer"), |ui| {
+            if icons::ribbon_button(ui, &icons::PDF.to_string(), "PDF", false).on_hover_text(tr("Exporteren naar PDF (Ctrl+Shift+P)")).clicked() {
                 self.run(ctx, MenuAction::ExportPdf);
             }
-            if icons::ribbon_button(ui, &icons::VECTOR.to_string(), "SVG", false).on_hover_text("Exporteren naar SVG").clicked() {
+            if icons::ribbon_button(ui, &icons::VECTOR.to_string(), "SVG", false).on_hover_text(tr("Exporteren naar SVG")).clicked() {
                 self.run(ctx, MenuAction::ExportSvg);
             }
-            if icons::ribbon_button(ui, &icons::EXPORT.to_string(), "Mathcad", false).on_hover_text("Opslaan als Mathcad Prime-bestand (.mcdx)").clicked() {
+            if icons::ribbon_button(ui, &icons::EXPORT.to_string(), "Mathcad", false).on_hover_text(tr("Opslaan als Mathcad Prime-bestand (.mcdx)")).clicked() {
                 self.export_mcdx();
             }
-            if icons::ribbon_button(ui, &icons::CODE.to_string(), "Bron", false).on_hover_text("De tekst van het werkblad tonen of verbergen (Ctrl+Shift+B)").clicked() {
+            if icons::ribbon_button(ui, &icons::CODE.to_string(), "Bron", false).on_hover_text(tr("De tekst van het werkblad tonen of verbergen (Ctrl+Shift+B)")).clicked() {
                 self.run(ctx, MenuAction::BronTonen);
             }
         });

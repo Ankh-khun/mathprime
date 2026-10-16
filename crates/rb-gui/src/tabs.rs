@@ -9,6 +9,7 @@ use crate::canvas::CanvasState;
 use eframe::egui::{self, RichText};
 use rb_sheet::Sheet;
 use std::path::PathBuf;
+use crate::taal::t;
 
 /// Alles wat bij één open werkblad hoort.
 pub(crate) struct DocState {
@@ -241,7 +242,7 @@ impl App {
                 resp.on_hover_text(self.tab_path(i));
             }
             let plus = ui.add(egui::Button::new(RichText::new(crate::icons::PLUS.to_string()).size(15.0)).frame_when_inactive(false));
-            if plus.on_hover_text("Nieuw werkblad (Ctrl+N)").clicked() {
+            if plus.on_hover_text(t("Nieuw werkblad (Ctrl+N)")).clicked() {
                 self.new_tab();
             }
         });

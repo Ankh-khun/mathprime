@@ -17,6 +17,7 @@ use rb_export::doc::{box_ops, layout_full, Grid, Page, RegionRect, Setup, ROW_H}
 use rb_export::FontMetrics;
 use rb_layout::LayoutOptions;
 use rb_sheet::{parse_sheet, Kind, Output, Pos};
+use crate::taal::t;
 
 /// Ruimte rond en tussen de pagina's op het scherm (pixels).
 const PAGE_GAP: f32 = 18.0;
@@ -1522,7 +1523,7 @@ impl App {
                             ui.label(egui::RichText::new(hint).small().weak());
                         });
                     }
-                    ui.label(egui::RichText::new("Tab: overnemen · ↑↓ kiezen · Esc").small().weak());
+                    ui.label(egui::RichText::new(t("Tab: overnemen · ↑↓ kiezen · Esc")).small().weak());
                 });
             });
             if let Some(i) = clicked {
@@ -1670,6 +1671,7 @@ impl App {
         self.cv.set = crate::settings::Settings::parse(&text);
         self.cv.dark = self.cv.set.thema == crate::settings::Thema::Donker;
         rb_units::set_significant_digits(self.cv.set.digits);
+        crate::taal::set_english(self.cv.set.english);
     }
 
     pub(crate) fn save_settings(&mut self) {
@@ -1684,7 +1686,7 @@ impl App {
     pub(crate) fn functions_window(&mut self, ctx: &egui::Context) {
         let mut open = self.cv.show_functions;
         let mut chosen = None;
-        egui::Window::new("Functies").open(&mut open).default_width(420.0).show(ctx, |ui| {
+        egui::Window::new(t("Functies")).open(&mut open).default_width(420.0).show(ctx, |ui| {
             egui::ScrollArea::vertical().max_height(420.0).show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     for n in rb_core::builtins::NAMES {

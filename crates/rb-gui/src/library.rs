@@ -282,6 +282,7 @@ mod tests {
 
 use crate::app::App;
 use eframe::egui::{self, RichText};
+use crate::taal::t;
 
 /// Wat het paneel bijhoudt.
 pub struct LibraryState {
@@ -338,10 +339,10 @@ impl App {
                 }
             });
         });
-        ui.add(egui::TextEdit::singleline(&mut self.lib.search).hint_text("Zoeken (naam of grootheid)…").desired_width(f32::INFINITY));
-        ui.checkbox(&mut self.lib.with_inputs, "Met invoerwaarden (waarde 1, pas ze aan)")
-            .on_hover_text("Grootheden die het blad nog niet kent, krijgen een regel met waarde 1 en een eenheid");
-        if ui.button("+ Eigen formule opslaan…").clicked() {
+        ui.add(egui::TextEdit::singleline(&mut self.lib.search).hint_text(t("Zoeken (naam of grootheid)…")).desired_width(f32::INFINITY));
+        ui.checkbox(&mut self.lib.with_inputs, t("Met invoerwaarden (waarde 1, pas ze aan)"))
+            .on_hover_text(t("Grootheden die het blad nog niet kent, krijgen een regel met waarde 1 en een eenheid"));
+        if ui.button(t("+ Eigen formule opslaan…")).clicked() {
             let eq = self.current_equation().map(|(l, r)| format!("{} == {}", rb_edit::convert::expr_text(&l), rb_edit::convert::expr_text(&r))).unwrap_or_default();
             self.lib.form = Some(Form { name: String::new(), category: "Eigen formules".into(), eq, vars: String::new(), error: None });
         }
@@ -371,20 +372,20 @@ impl App {
                             ui.set_width(ui.available_width());
                             ui.horizontal(|ui| {
                                 ui.label(RichText::new(&f.name).strong());
-                                if f.own && ui.small_button("🗑").on_hover_text("Uit de bibliotheek verwijderen").clicked() {
+                                if f.own && ui.small_button("🗑").on_hover_text(t("Uit de bibliotheek verwijderen")).clicked() {
                                     act = Some(Act::Delete(f.clone()));
                                 }
                             });
                             formula_view(ui, &f.eq, dark);
                             ui.horizontal_wrapped(|ui| {
-                                ui.label(RichText::new("Oplossen naar:").small());
+                                ui.label(RichText::new(t("Oplossen naar:")).small());
                                 for name in f.quantities() {
                                     let tip = f.var(&name).map_or(String::new(), |v| if v.unit.is_empty() { v.what.clone() } else { format!("{} [{}]", v.what, v.unit) });
                                     if ui.button(&name).on_hover_text(tip).clicked() {
                                         act = Some(Act::Solve(f.clone(), name));
                                     }
                                 }
-                                if ui.small_button("als uitleg").on_hover_text("De formule alleen tonen (niet uitrekenen)").clicked() {
+                                if ui.small_button("als uitleg").on_hover_text(t("De formule alleen tonen (niet uitrekenen)")).clicked() {
                                     act = Some(Act::Show(f.clone()));
                                 }
                             });
@@ -393,7 +394,7 @@ impl App {
                 });
             }
             if cats.is_empty() {
-                ui.label("Niets gevonden.");
+                ui.label(t("Niets gevonden."));
             }
         });
         match act {
@@ -424,26 +425,26 @@ impl App {
         let Some(form) = &mut self.lib.form else { return };
         let mut open = true;
         let mut save = false;
-        egui::Window::new("Eigen formule opslaan").open(&mut open).collapsible(false).default_width(420.0).show(ctx, |ui| {
+        egui::Window::new(t("Eigen formule opslaan")).open(&mut open).collapsible(false).default_width(420.0).show(ctx, |ui| {
             egui::Grid::new("formulier").num_columns(2).show(ui, |ui| {
-                ui.label("Naam");
+                ui.label(t("Naam"));
                 ui.text_edit_singleline(&mut form.name);
                 ui.end_row();
-                ui.label("Categorie");
+                ui.label(t("Categorie"));
                 ui.text_edit_singleline(&mut form.category);
                 ui.end_row();
-                ui.label("Vergelijking");
-                ui.add(egui::TextEdit::singleline(&mut form.eq).hint_text("F == m * a").font(egui::TextStyle::Monospace));
+                ui.label(t("Vergelijking"));
+                ui.add(egui::TextEdit::singleline(&mut form.eq).hint_text(t("F == m * a")).font(egui::TextStyle::Monospace));
                 ui.end_row();
-                ui.label("Grootheden");
+                ui.label(t("Grootheden"));
                 ui.add(egui::TextEdit::multiline(&mut form.vars).hint_text("F: kracht [N]\nm: massa [kg]\na: versnelling [m/s^2]").desired_rows(4));
                 ui.end_row();
             });
-            ui.label(RichText::new("Per grootheid: naam: omschrijving [eenheid]. Optioneel; de eenheid wordt gebruikt voor de invoerwaarden.").small());
+            ui.label(RichText::new(t("Per grootheid: naam: omschrijving [eenheid]. Optioneel; de eenheid wordt gebruikt voor de invoerwaarden.")).small());
             if let Some(e) = &form.error {
                 ui.colored_label(egui::Color32::from_rgb(190, 30, 30), e);
             }
-            if ui.button("Opslaan").clicked() {
+            if ui.button(t("Opslaan")).clicked() {
                 save = true;
             }
         });

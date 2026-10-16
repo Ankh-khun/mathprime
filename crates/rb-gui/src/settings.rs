@@ -5,6 +5,7 @@
 use crate::app::App;
 use crate::canvas::Background;
 use eframe::egui::{self, RichText};
+use crate::taal::t;
 
 /// Licht, donker of zoals Windows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -49,6 +50,8 @@ pub struct Settings {
     pub start_zoom: f32,
     /// Eens per dag kijken of er een nieuwere versie is (update.rs).
     pub updates: bool,
+    /// De interface in het Engels (taal.rs).
+    pub english: bool,
 }
 
 impl Default for Settings {
@@ -61,6 +64,7 @@ impl Default for Settings {
             digits: 6,
             start_zoom: 1.5,
             updates: true,
+            english: false,
         }
     }
 }
@@ -83,6 +87,7 @@ impl Settings {
                 "aanvullen" => s.autocomplete = v != "uit",
                 "cijfers" => s.digits = v.parse::<usize>().map_or(6, |n| n.clamp(2, 15)),
                 "updates" => s.updates = v != "uit",
+                "taal" => s.english = v == "en",
                 "zoom" => s.start_zoom = v.parse::<f32>().map_or(1.5, |z| z.clamp(0.6, 5.0)),
                 _ => {}
             }
@@ -92,14 +97,15 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\n",
+            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\ntaal = {}\n",
             self.thema.key(),
             self.background.key(),
             if self.start_welcome { "welkom" } else { "leeg" },
             if self.autocomplete { "aan" } else { "uit" },
             self.digits,
             self.start_zoom,
-            if self.updates { "aan" } else { "uit" }
+            if self.updates { "aan" } else { "uit" },
+            if self.english { "en" } else { "nl" }
         )
     }
 }
@@ -137,11 +143,11 @@ impl App {
                 let weak = ui.visuals().weak_text_color();
                 ui.label(RichText::new(crate::icons::FUNCTION.to_string()).size(34.0).color(weak));
                 ui.add_space(6.0);
-                ui.label(RichText::new("Klik ergens en begin te typen").size(17.0));
-                ui.label(RichText::new("Of open een bestand met Ctrl+O. Een voorbeeld staat onder Help → Welkomstblad.").size(12.0).color(weak));
+                ui.label(RichText::new(t("Klik ergens en begin te typen")).size(17.0));
+                ui.label(RichText::new(t("Of open een bestand met Ctrl+O. Een voorbeeld staat onder Help → Welkomstblad.")).size(12.0).color(weak));
                 if !recent.is_empty() {
                     ui.add_space(18.0);
-                    ui.label(RichText::new("Recent geopend").size(12.0).strong().color(weak));
+                    ui.label(RichText::new(t("Recent geopend")).size(12.0).strong().color(weak));
                     ui.add_space(4.0);
                     for p in &recent {
                         let name = p.file_name().map_or_else(|| p.display().to_string(), |n| n.to_string_lossy().into_owned());
@@ -176,33 +182,39 @@ impl App {
         let mut open = self.cv.show_settings;
         let before = self.cv.set.clone();
         let mut s = before.clone();
-        egui::Window::new("Instellingen").open(&mut open).resizable(false).collapsible(false).fade_in(false).anchor(egui::Align2::CENTER_TOP, [0.0, 140.0]).show(ctx, |ui| {
+        egui::Window::new(t("Instellingen")).open(&mut open).resizable(false).collapsible(false).fade_in(false).anchor(egui::Align2::CENTER_TOP, [0.0, 140.0]).show(ctx, |ui| {
             ui.set_min_width(440.0);
             // een kop per onderdeel, de instellingen eronder in twee kolommen
             let section = |ui: &mut egui::Ui, icon: char, title: &str| {
                 ui.add_space(6.0);
-                ui.label(RichText::new(format!("{icon}  {title}")).size(15.0).strong());
+                ui.label(RichText::new(format!("{icon}  {}", t(title))).size(15.0).strong());
                 ui.separator();
             };
             let row_label = |ui: &mut egui::Ui, text: &str| {
                 ui.allocate_ui_with_layout(egui::vec2(150.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(text).color(ui.visuals().weak_text_color()))
+                    ui.label(RichText::new(t(text)).color(ui.visuals().weak_text_color()))
                 });
             };
 
             section(ui, crate::icons::SUN, "Uiterlijk");
             egui::Grid::new("inst-uiterlijk").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
+                row_label(ui, "Taal");
+                ui.horizontal(|ui| {
+                    ui.selectable_value(&mut s.english, false, "Nederlands");
+                    ui.selectable_value(&mut s.english, true, "English");
+                });
+                ui.end_row();
                 row_label(ui, "Thema");
                 ui.horizontal(|ui| {
-                    for t in Thema::ALL {
-                        ui.selectable_value(&mut s.thema, t, t.label());
+                    for th in Thema::ALL {
+                        ui.selectable_value(&mut s.thema, th, t(th.label()));
                     }
                 });
                 ui.end_row();
                 row_label(ui, "Achtergrond");
                 ui.horizontal(|ui| {
                     for b in Background::ALL {
-                        ui.selectable_value(&mut s.background, b, b.label());
+                        ui.selectable_value(&mut s.background, b, t(b.label()));
                     }
                 });
                 ui.end_row();
@@ -218,8 +230,8 @@ impl App {
             egui::Grid::new("inst-starten").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
                 row_label(ui, "Bij het starten");
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut s.start_welcome, false, "Leeg blad");
-                    ui.selectable_value(&mut s.start_welcome, true, "Welkomstblad");
+                    ui.selectable_value(&mut s.start_welcome, false, t("Leeg blad"));
+                    ui.selectable_value(&mut s.start_welcome, true, t("Welkomstblad"));
                 });
                 ui.end_row();
             });
@@ -230,23 +242,24 @@ impl App {
                 ui.add(egui::Slider::new(&mut s.digits, 2..=15).text("significant"));
                 ui.end_row();
                 row_label(ui, "Automatisch aanvullen");
-                ui.checkbox(&mut s.autocomplete, "lijst met namen tijdens het typen");
+                ui.checkbox(&mut s.autocomplete, t("lijst met namen tijdens het typen"));
                 ui.end_row();
             });
 
             section(ui, crate::icons::REFRESH, "Updates");
             egui::Grid::new("inst-updates").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
                 row_label(ui, "Nieuwe versies");
-                ui.checkbox(&mut s.updates, "eens per dag kijken op GitHub")
-                    .on_hover_text("Vraagt alleen het nummer van de nieuwste versie op; er gaat niets van jou mee");
+                ui.checkbox(&mut s.updates, t("eens per dag kijken op GitHub"))
+                    .on_hover_text(t("Vraagt alleen het nummer van de nieuwste versie op; er gaat niets van jou mee"));
                 ui.end_row();
             });
             ui.add_space(10.0);
-            ui.label(RichText::new("Wijzigingen werken meteen. Sneltoetsen staan in keymap.txt (Help → Sneltoetsen).").small().weak());
+            ui.label(RichText::new(t("Wijzigingen werken meteen. Sneltoetsen staan in keymap.txt (Help → Sneltoetsen).")).small().weak());
         });
         self.cv.show_settings = open;
         if s != before {
             let digits_changed = s.digits != before.digits;
+            crate::taal::set_english(s.english);
             self.cv.set = s;
             self.apply_theme(ctx);
             if digits_changed {
@@ -264,7 +277,7 @@ mod tests {
 
     #[test]
     fn lezen_en_schrijven() {
-        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false };
+        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false, english: true };
         assert_eq!(Settings::parse(&s.to_text()), s);
         // een oud bestand: alleen thema en achtergrond, de rest standaard
         let old = Settings::parse("# Instellingen van MathPrime\nachtergrond = ruitjes\nthema = donker\n");

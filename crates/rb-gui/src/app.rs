@@ -5,6 +5,7 @@ use eframe::egui::{self, text::CCursor, text::CCursorRange, Color32, RichText, S
 use rb_sheet::Sheet;
 use std::path::PathBuf;
 use std::time::Instant;
+use crate::taal::t;
 
 const WELKOM: &str = include_str!("welkom.rkn");
 
@@ -165,7 +166,7 @@ impl App {
         self.dirty = false;
         self.generation += 1;
         self.cv.reset();
-        self.status = format!("Doorgerekend in {:.1} ms", start.elapsed().as_secs_f64() * 1000.0);
+        self.status = format!("{} {:.1} ms", crate::taal::nl_en("Doorgerekend in", "Calculated in"), start.elapsed().as_secs_f64() * 1000.0);
     }
 
     /// Reken opnieuw na een wijziging in de bron: als precies één regel veranderde, alleen wat
@@ -458,7 +459,7 @@ impl App {
                 Action::Zoeken | Action::Vervangen => i::SEARCH,
                 Action::Afdrukvoorbeeld | Action::Afdrukken => i::PDF,
             };
-            let mut b = egui::Button::new(format!("{icon}   {}", a.label()));
+            let mut b = egui::Button::new(format!("{icon}   {}", t(a.label())));
             if let Some(sc) = km.shortcut(a) {
                 b = b.shortcut_text(ui.ctx().format_shortcut(sc));
             }
@@ -468,7 +469,7 @@ impl App {
             }
         };
         egui::MenuBar::new().ui(ui, |ui| {
-            ui.menu_button("Bestand", |ui| {
+            ui.menu_button(t("Bestand"), |ui| {
                 item(ui, &self.keymap, Action::Nieuw, &mut chosen);
                 ui.menu_button(format!("{}   Nieuw uit sjabloon", crate::icons::NEW), |ui| {
                     for (name, text) in SJABLONEN {
@@ -481,7 +482,7 @@ impl App {
                 for a in [Action::Openen, Action::Opslaan, Action::OpslaanAls] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
-                if ui.button("Opslaan als Mathcad (.mcdx)…").clicked() {
+                if ui.button(t("Opslaan als Mathcad (.mcdx)…")).clicked() {
                     ui.close();
                     self.export_mcdx();
                 }
@@ -492,27 +493,27 @@ impl App {
                 ui.separator();
                 item(ui, &self.keymap, Action::Instellingen, &mut chosen);
             });
-            ui.menu_button("Beeld", |ui| {
+            ui.menu_button(t("Beeld"), |ui| {
                 for a in [Action::Zoeken, Action::Vervangen, Action::BronTonen, Action::Groter, Action::Kleiner, Action::Herberekenen] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
                 ui.separator();
                 let mut dark = self.cv.dark;
-                if ui.checkbox(&mut dark, "Donkere modus").clicked() {
+                if ui.checkbox(&mut dark, t("Donkere modus")).clicked() {
                     self.cv.set.thema = if dark { crate::settings::Thema::Donker } else { crate::settings::Thema::Licht };
                     self.apply_theme(ctx);
                     self.save_settings();
                     ui.close();
                 }
             });
-            ui.menu_button("Invoegen", |ui| {
+            ui.menu_button(t("Invoegen"), |ui| {
                 item(ui, &self.keymap, Action::Grieks, &mut chosen);
-                if ui.button("Afbeelding…").clicked() {
+                if ui.button(t("Afbeelding…")).clicked() {
                     ui.close();
                     self.insert(ctx, crate::canvas::Ins::Image);
                 }
             });
-            ui.menu_button("Help", |ui| {
+            ui.menu_button(t("Help"), |ui| {
                 for a in [Action::Help, Action::Sneltoetsen, Action::Welkomstblad] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
@@ -557,13 +558,13 @@ impl App {
                 ui.heading("Niet-opgeslagen wijzigingen");
                 ui.label(format!("{} heeft wijzigingen die nog niet zijn opgeslagen.", self.file_name()));
                 ui.horizontal(|ui| {
-                    if ui.button("Opslaan").clicked() && self.save() {
+                    if ui.button(t("Opslaan")).clicked() && self.save() {
                         choice = Some(true);
                     }
-                    if ui.button("Niet opslaan").clicked() {
+                    if ui.button(t("Niet opslaan")).clicked() {
                         choice = Some(false);
                     }
-                    if ui.button("Annuleren").clicked() {
+                    if ui.button(t("Annuleren")).clicked() {
                         cancel = true;
                     }
                 });
@@ -580,10 +581,10 @@ impl App {
             }
         }
         let mut open = self.show_keys;
-        egui::Window::new("Sneltoetsen").open(&mut open).collapsible(false).show(ctx, |ui| {
+        egui::Window::new(t("Sneltoetsen")).open(&mut open).collapsible(false).show(ctx, |ui| {
             egui::Grid::new("toetsen").striped(true).show(ui, |ui| {
                 for (a, sc) in &self.keymap.binds {
-                    ui.label(a.label());
+                    ui.label(t(a.label()));
                     ui.monospace(ctx.format_shortcut(sc));
                     ui.monospace(a.key());
                     ui.end_row();
@@ -593,19 +594,19 @@ impl App {
             match &self.keymap.path {
                 Some(p) => {
                     ui.label(format!("Aanpassen in {} (regels 'actie = toets').", p.display()));
-                    if !p.exists() && ui.button("Bestand met de standaardtoetsen aanmaken").clicked() {
+                    if !p.exists() && ui.button(t("Bestand met de standaardtoetsen aanmaken")).clicked() {
                         let ok = p.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|_| std::fs::write(p, Keymap::default_file()));
                         self.status = match ok {
                             Ok(()) => format!("Aangemaakt: {}", p.display()),
                             Err(e) => format!("Kan {} niet aanmaken: {e}", p.display()),
                         };
                     }
-                    if ui.button("Opnieuw inlezen").clicked() {
+                    if ui.button(t("Opnieuw inlezen")).clicked() {
                         self.keymap = Keymap::load();
                     }
                 }
                 None => {
-                    ui.label("Geen instellingenmap gevonden; de standaardtoetsen gelden.");
+                    ui.label(t("Geen instellingenmap gevonden; de standaardtoetsen gelden."));
                 }
             }
             for prob in &self.keymap.problems {
@@ -614,15 +615,15 @@ impl App {
         });
         self.show_keys = open;
         let mut open = self.show_help;
-        egui::Window::new("Syntax en hulp").open(&mut open).default_width(560.0).show(ctx, |ui| {
+        egui::Window::new(t("Syntax en hulp")).open(&mut open).default_width(560.0).show(ctx, |ui| {
             ScrollArea::vertical().max_height(500.0).show(ui, |ui| {
                 ui.monospace(HELP);
             });
         });
         self.show_help = open;
         let mut open = self.show_import;
-        egui::Window::new("Mathcad: wat niet helemaal overkwam").open(&mut open).default_width(480.0).show(ctx, |ui| {
-            ui.label("Bij inlezen staat op die plek een grijze notitie; bij opslaan staat de regio in Mathcad als tekst.");
+        egui::Window::new(t("Mathcad: wat niet helemaal overkwam")).open(&mut open).default_width(480.0).show(ctx, |ui| {
+            ui.label(t("Bij inlezen staat op die plek een grijze notitie; bij opslaan staat de regio in Mathcad als tekst."));
             ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
                 for n in &self.import_notes {
                     ui.label(format!("• {n}"));
@@ -823,15 +824,15 @@ impl eframe::App for App {
             egui::Panel::top("afdrukvoorbeeld").show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let pages = self.page_count();
-                    ui.label(RichText::new(format!("{}  Afdrukvoorbeeld", crate::icons::PDF)).strong());
-                    ui.label(RichText::new(format!("{pages} {} · zo komt het in de PDF", if pages == 1 { "pagina" } else { "pagina's" })).weak());
+                    ui.label(RichText::new(format!("{}  {}", crate::icons::PDF, t("Afdrukvoorbeeld"))).strong());
+                    ui.label(RichText::new(match (crate::taal::english(), pages) { (false, 1) => "1 pagina · zo komt het in de PDF".to_string(), (false, n) => format!("{n} pagina's · zo komt het in de PDF"), (true, 1) => "1 page · as it will be in the PDF".to_string(), (true, n) => format!("{n} pages · as it will be in the PDF") }).weak());
                     if ui.button(format!("{}  Afdrukken…", crate::icons::PDF)).clicked() {
                         self.run(ctx, Action::Afdrukken);
                     }
-                    if ui.button("PDF maken…").clicked() {
+                    if ui.button(t("PDF maken…")).clicked() {
                         self.run(ctx, Action::ExportPdf);
                     }
-                    if ui.button("Terug naar bewerken (Esc)").clicked() {
+                    if ui.button(t("Terug naar bewerken (Esc)")).clicked() {
                         self.cv.preview = false;
                     }
                 });
@@ -847,36 +848,36 @@ impl eframe::App for App {
                     (Color32::from_rgb(0, 120, 60), Color32::from_rgb(190, 30, 30))
                 };
                 if errors > 0 {
-                    let text = format!("{} {errors} {}", crate::icons::ALERT, if errors == 1 { "fout" } else { "fouten" });
+                    let text = format!("{} {errors} {}", crate::icons::ALERT, crate::taal::nl_en(if errors == 1 { "fout" } else { "fouten" }, if errors == 1 { "error" } else { "errors" }));
                     let r = ui.add(egui::Label::new(RichText::new(text).color(red)).sense(egui::Sense::click()));
-                    if r.on_hover_text("Naar de eerste fout").clicked() {
+                    if r.on_hover_text(t("Naar de eerste fout")).clicked() {
                         self.goto_first_error();
                     }
                 } else {
-                    ui.label(RichText::new(format!("{} Geen fouten", crate::icons::OK)).color(green));
+                    ui.label(RichText::new(format!("{} {}", crate::icons::OK, crate::taal::nl_en("Geen fouten", "No errors"))).color(green));
                 }
                 ui.add_space(8.0);
-                ui.label(RichText::new(format!("{n} regio's  ·  {}", self.status)).weak());
+                ui.label(RichText::new(format!("{n} {}  ·  {}", crate::taal::nl_en("regio's", "regions"), self.status)).weak());
                 if let Some(u) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
                     self.update = Some(u);
                     self.update_rx = None;
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let plain = |s: String| egui::Button::new(RichText::new(s).size(14.0)).frame_when_inactive(false);
-                    if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text("Groter (Ctrl+wiel)").clicked() {
+                    if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text(t("Groter (Ctrl+wiel)")).clicked() {
                         self.run(ctx, Action::Groter);
                     }
-                    if ui.add(egui::Label::new(format!("{:.0}%", self.zoom / 1.5 * 100.0)).sense(egui::Sense::click())).on_hover_text("Terug naar 100%").clicked() {
+                    if ui.add(egui::Label::new(format!("{:.0}%", self.zoom / 1.5 * 100.0)).sense(egui::Sense::click())).on_hover_text(t("Terug naar 100%")).clicked() {
                         self.zoom = 1.5;
                     }
-                    if ui.add(plain(crate::icons::ZOOM_OUT.to_string())).on_hover_text("Kleiner (Ctrl+wiel)").clicked() {
+                    if ui.add(plain(crate::icons::ZOOM_OUT.to_string())).on_hover_text(t("Kleiner (Ctrl+wiel)")).clicked() {
                         self.run(ctx, Action::Kleiner);
                     }
                     if let Some(u) = &self.update {
                         ui.add_space(12.0);
-                        let text = RichText::new(format!("{}  Versie {} is uit", crate::icons::REFRESH, u.version)).color(crate::icons::ACCENT);
+                        let text = RichText::new(format!("{}  {} {} {}", crate::icons::REFRESH, crate::taal::nl_en("Versie", "Version"), u.version, crate::taal::nl_en("is uit", "is out"))).color(crate::icons::ACCENT);
                         let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
-                        if r.on_hover_text("Naar de downloadpagina").clicked() {
+                        if r.on_hover_text(t("Naar de downloadpagina")).clicked() {
                             ctx.open_url(egui::OpenUrl::new_tab(&u.url));
                         }
                     }

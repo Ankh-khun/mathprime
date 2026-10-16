@@ -7,6 +7,7 @@
 
 use crate::app::App;
 use eframe::egui::{self, RichText};
+use crate::taal::t;
 
 #[derive(Debug, Clone, Default)]
 pub struct FindState {
@@ -137,7 +138,7 @@ impl App {
         let (mut next, mut prev, mut replace_all) = (false, false, false);
         ui.horizontal(|ui| {
             ui.label(RichText::new(crate::icons::SEARCH.to_string()).size(15.0));
-            let r = ui.add(egui::TextEdit::singleline(&mut f.query).hint_text("Zoeken").desired_width(200.0));
+            let r = ui.add(egui::TextEdit::singleline(&mut f.query).hint_text(t("Zoeken")).desired_width(200.0));
             if std::mem::take(&mut f.focus) {
                 r.request_focus();
             }
@@ -156,14 +157,14 @@ impl App {
                 format!("{} van {}", f.current.min(matches.len() - 1) + 1, matches.len())
             };
             ui.label(RichText::new(count).weak());
-            if ui.small_button("▲").on_hover_text("Vorige (Shift+Enter)").clicked() {
+            if ui.small_button("▲").on_hover_text(t("Vorige (Shift+Enter)")).clicked() {
                 prev = true;
             }
-            if ui.small_button("▼").on_hover_text("Volgende (Enter)").clicked() {
+            if ui.small_button("▼").on_hover_text(t("Volgende (Enter)")).clicked() {
                 next = true;
             }
-            ui.checkbox(&mut f.whole, "Hele namen").on_hover_text("Alleen variabelen en functies met precies deze naam, niet stukjes tekst");
-            ui.toggle_value(&mut f.show_replace, "Vervangen");
+            ui.checkbox(&mut f.whole, t("Hele namen")).on_hover_text(t("Alleen variabelen en functies met precies deze naam, niet stukjes tekst"));
+            ui.toggle_value(&mut f.show_replace, t("Vervangen"));
             if f.show_replace {
                 ui.add(egui::TextEdit::singleline(&mut f.replace).hint_text(if f.whole { "Nieuwe naam" } else { "Vervangen door" }).desired_width(160.0));
                 let label = if f.whole { "Hernoem overal" } else { "Vervang alles" };
@@ -172,7 +173,7 @@ impl App {
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button(crate::icons::CLOSE.to_string()).on_hover_text("Sluiten (Esc)").clicked() {
+                if ui.small_button(crate::icons::CLOSE.to_string()).on_hover_text(t("Sluiten (Esc)")).clicked() {
                     close = true;
                 }
             });

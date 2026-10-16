@@ -17,6 +17,7 @@ mod settings;
 mod tabs;
 mod shot;
 mod update;
+mod taal;
 
 fn main() -> eframe::Result {
     let file = std::env::args().nth(1).map(std::path::PathBuf::from);
