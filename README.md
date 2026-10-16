@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.6 — odesolve voor stelsels en randwaardeproblemen, eenheden bij symbolisch rekenen; v1.5: melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.7 — 3D-oppervlakken, hoogtelijnen, poolgrafieken en een tweede y-as; limieten, Taylorreeksen en meer integralen bij de pijl; Radau voor stijve vergelijkingen; regress, loess en gladmaken; direct afdrukken; sjablonen; slepen op het raster; Engelse interface; MIT-licentie; v1.6: odesolve voor stelsels en randwaardeproblemen, eenheden bij symbolisch rekenen; v1.5: melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -123,7 +123,14 @@ niet in stukjes van andere namen of waar dezelfde letters een eenheid zijn (de `
 de definitie van een variabele `L`).
 
 **Ctrl+Alt+P** (Bestand → Afdrukvoorbeeld) toont het blad precies zoals het in de PDF komt: pagina's,
-kop- en voetteksten en grafieken als vaste afbeelding. Esc gaat terug naar bewerken.
+kop- en voetteksten en grafieken als vaste afbeelding. Esc gaat terug naar bewerken. **Ctrl+P** drukt
+af: MathPrime maakt die PDF en geeft hem aan de PDF-lezer van Windows, die het printvenster toont
+(kan die niet direct afdrukken, dan gaat de PDF open). Exporteren naar PDF is **Ctrl+Shift+P**.
+
+Bestand → **Nieuw uit sjabloon** geeft een verslag, een tentamen (vragen als inklapbare gebieden), een
+ligger op twee steunpunten of een warmtebalans, met kop- en voettekst. Regio's verslepen gaat op het
+raster; valt een regio over een andere, dan schuift hij omlaag tot er plek is, en wat je sleepte blijft
+geselecteerd. Instellingen → **Taal** zet de bediening in het Engels (meldingen blijven Nederlands).
 
 Meerdere werkbladen staan in tabbladen onder het lint, zoals in Prime. Openen (of een bestand naar
 het venster slepen) opent een nieuw tabblad; is het huidige blad nog leeg, dan komt het daar. Een
@@ -194,6 +201,10 @@ knoppen staan op het lint onder Operatoren → Symbolisch.
 | `2*x + 3*x → simplify` | 5x |
 | `deriv(x^3 + 2*x, x, x) →` | 3x² + 2 |
 | `integral(t, t, 0, x) → simplify` | x²/2 |
+| `integral(x * exp(x), x, 0, 1) →` | 1 (partieel; ook sin, cos, tan, exp, sinh, cosh en machten van a·x + b) |
+| `sin(x) / x → limit, x = 0` | 1 (l'Hôpital; ook `x = ∞`) |
+| `cos(x) → series, x = 0, 5` | x⁴/24 − x²/2 + 1 (Taylor tot en met de macht 4) |
+| `sqrt(2) * x → float, 4` | 1.414 x |
 
 Namen met een bekende waarde worden ingevuld en eigen functies uitgeschreven, zoals in Mathcad. Een
 waarde met eenheid komt erin als getal maal eenheid, en eenheden zijn daarna gewone symbolen
@@ -248,6 +259,10 @@ plot t = 0 s ; 2 s ; 500 : u(t)       met een gekozen aantal punten
 plot x.m : F.m                        meetpunten (twee vectoren)
 plot f = 10 Hz ; 100 kHz : abs(H(f)) | log xy    logaritmische assen (Bodediagram)
 plot x = 0 ; 10 : sin(x) | y = -1 ; 1, x = 2 ; 8  vaste asgrenzen (zonder eenheid: in die van de as)
+plot θ = 0 ; 2*π : 1 + cos(θ) | polar             poolgrafiek (x en y even groot)
+plot t = 0 s ; 10 s : F(t) ; u(t) = kN ; mm        na ';' de rechter y-as, met eigen eenheid
+plot x = -3 ; 3, y = -3 ; 3 : f(x, y)             3D-oppervlak (slepen draait; 40 × 40 punten)
+plot x = -3 ; 3, y = -3 ; 3 : f(x, y) | contour   hoogtelijnen
 @40,3 b := 2 m             regio op kolom 40, rij 3 (volgorde: rij, dan kolom)
 ```
 
@@ -309,10 +324,12 @@ u := odesolve(t, 2 s)           een functie: u(1 s) = mm
                                 [x; y] := odesolve([x; y], t, 10)
                                 randwaarden: w''''(x) == q/EI, w(0 m) == 0 m, w''(0 m) == 0,
                                 w(L) == 0 m, w''(L) == 0, w := odesolve(x, L)   (schietmethode)
-rkfixed([1; 0], 0, π, 100, D) = matrix met t en y; D(t, y) := [y[1]; -y[0]]  (ook Rkadapt)
+rkfixed([1; 0], 0, π, 100, D) = matrix met t en y; D(t, y) := [y[1]; -y[0]]  (ook Rkadapt, en Radau voor stijve vergelijkingen)
 
 λ := eigenvals(M^-1 * K)        ook eigenvecs, svd, svds, qr, lu, cholesky, rank, cond2
 slope(x.m, F.m) = N/mm          ook intercept, line, stderr, polyfit, linfit(vx, vy, F), genfit
+interp(regress(vx, vy, 2), vx, vy, x) =   veelterm; ook interp(loess(vx, vy, 0.5), vx, vy, x)
+ksmooth(vx, vy, b)  medsmooth(vy, 5)       gladmaken; localmax(vy), localmin(vy) geven indices; filterNaN(M)
 interp(cspline(vx, vy), vx, vy, x) =    splines; linterp(vx, vy, x) lineair
 qnorm(0.975, 10 mm, 2 mm) =     verdelingen d/p/q: norm, lnorm, t, chisq, F, exp, unif, weibull
 fft(v) =                        ook ifft; elke lengte

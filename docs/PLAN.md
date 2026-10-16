@@ -24,7 +24,31 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.6)
+## 2. Wat er nu staat (v1.7)
+
+**Nieuw in v1.7.** De analyse van grote bestanden (canvas.rs, symbolic.rs, de interfaceteksten) ging via
+Antigravity (agy, alleen lezen); het schrijven en testen gebeurde hier.
+- **Grafieken** (`rb-sheet/src/plot.rs`): opties `polar` en `contour`, `;` tussen twee groepen reeksen (rechter
+  y-as, eigen eenheid), twee bereiken in de kop voor een oppervlak (`Surface`, standaard 40 × 40). Tekenen in
+  `doc.rs`: `surface_ops` (3D met schilder-algoritme, `Op::Polygon`, kleur via `heat`; hoogtelijnen met
+  marching squares, `contour_segments`), de rechter as met eigen `nice_ticks`. In de interface draait slepen
+  het oppervlak (vlakjes als kale mesh: egui's randverzachting gaf punten bij dunne driehoekjes); de tweede
+  as via `custom_y_axes`, de rechter reeksen omgerekend naar de linker schaal.
+- **Symbolisch**: `limit` (invullen, l'Hôpital tot zes keer; ∞ via de hoogste machten van een gebroken
+  veelterm, anders `x = 1/t`), `series` (afgeleiden in a, met `limit` voor 0/0), `float` (`Env::float_fold`),
+  integralen met een lineair argument (`primitive_atom`) en partieel (`x^n` maal sin/cos/exp), sin/cos/tan bij
+  veelvouden van π/2 exact.
+- **Rekenen**: `Radau` (Radau IIA orde 5, vereenvoudigde Newton, stapgrootte via één stap tegen twee halve);
+  `regress`/`loess` als vector voor `interp` (zoals Mathcad: `[3; 3; k; c..]`, `[4; 4; span]`), `ksmooth`,
+  `medsmooth`, `localmax`/`localmin` (vanaf ORIGIN), `filterNaN`. `rkfixed`/`Radau` geven D een vector als de
+  beginwaarde een vector is.
+- **Bediening**: slepen op het raster (`drag_offset`: via `grid.cell`, dus over ingeklapte gebieden heen; bij
+  overlap rij voor rij omlaag; de selectie blijft); afdrukken (PDF naar het printwerkwoord van Windows);
+  sjablonen (`sjablonen/*.rkn`, getest op nul fouten); Engelse interface (`taal.rs`: de Nederlandse tekst is
+  de sleutel, het lint zoekt knoppen nog steeds op met de Nederlandse naam).
+- **Testbladen** (`tests/corpus`, nu 12): `crates/rb-sheet/tests/corpus.rs` eist nul fouten en controleert elke
+  regel met `// verwacht: …`; dat draait ook in de CI.
+- MIT-licentie (`LICENSE`) en `CONTRIBUTING.md`.
 
 **Nieuw in v1.6.** `odesolve` voor stelsels (`[x; y] := odesolve([x; y], t, b)`; `Stmt::ode_system`, de namen
 staan in de body van de bind, `Outcome::DefinedAll`, in de graaf via `also_defines`) en randwaardeproblemen

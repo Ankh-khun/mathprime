@@ -40,28 +40,28 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Verdelingen | `d`/`p`/`q` + `norm lnorm t chisq F exp unif weibull`; `dbinom pbinom dpois ppois`; `rnd runif rnorm` | v0.3 |
 | Speciale functies | `erf erfc Γ (gamma) lnGamma Beta Ψ (digamma)`, Bessel `J0 J1 Jn Y0 Y1 Yn I0 I1 In K0 K1 Kn` | v0.3 |
 | Interpolatie | `linterp`, `lspline`/`pspline`/`cspline` + `interp` | v0.3 |
-| Regressie | `slope intercept line stderr polyfit linfit genfit` | v0.3 |
+| Regressie | `slope intercept line stderr polyfit linfit genfit`; `regress` en `loess` (met `interp`), `ksmooth`, `medsmooth`, `localmax`, `localmin`, `filterNaN` | v0.3, v1.7 |
 | Oplossen | `root(f, x)`, `root(f, x, a, b)`, `polyroots`, `lsolve`, `Given` met `Find`/`Minerr`/`Minimize`/`Maximize` | v0.3 |
 | Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `odesolve` (willekeurige orde; stelsels `[x; y] := odesolve([x; y], t, b)`; begin- en randwaardeproblemen) | v0.3, v1.6 |
 | Signaalverwerking | `fft ifft cfft icfft` (elke lengte; numpy-normering, zie `PLAN.md` §3) | v0.3 |
 | Werkblad | definities, functies, resultaten, tekst, koppen, sweeps, posities `@kolom,rij`, afhankelijkheidsgraaf, meerregelige blokken, solve blocks | v0.1, posities v0.2, blokken v0.3 |
-| Grafieken (2D) | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface; logaritmische assen en vaste asgrenzen (`\| log xy, y = a ; b`) | v0.4, v1.4 |
+| Grafieken | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface; logaritmische assen en vaste asgrenzen (`\| log xy, y = a ; b`); poolgrafieken (`\| polar`), tweede y-as (`links ; rechts`), 3D-oppervlakken en hoogtelijnen (`plot x = .., y = .. : f(x, y) [\| contour]`) | v0.4, v1.4, v1.7 |
 | Formuleweergave | breuken, machten, indices, wortels, haken, matrices, Σ/∏/∫, d/dx, programmablokken, eenheden in resultaten | v0.4 |
 | Export | PDF (A4, ingebedde lettertypen) en SVG, ook via `mathprime-cli export` | v0.4 |
 | Tekst | strings als waarde; `concat strlen substr search num2str str2num str2vec vec2str IsString error` | v0.8 |
 | Bestanden | `READCSV READEXCEL READFILE WRITECSV WRITEEXCEL WRITEFILE` (.csv, .prn, .txt, .xlsx) | v0.9 |
-| Symbolisch | `→` met `simplify expand factor solve substitute`; `deriv` en veeltermintegralen symbolisch (geen limieten, reeksen, `float`, `assume`) | v0.9 |
+| Symbolisch | `→` met `simplify expand factor solve substitute limit series float`; `deriv`, integralen (veeltermen, standaardfuncties van a·x + b, partieel); eenheden doen mee (geen `assume`) | v0.9, v1.6, v1.7 |
 
 ## Nog te bouwen
 
 | categorie | voorbeelden | moeilijkheid | fase | bron |
 |---|---|---|---|---|
-| Differentiaalvergelijkingen (rest) | `sbval`, `bvalfit` (randwaarden zonder Given-blok), stijve oplossers (`Stiffb`, `Radau`), `Jacob` | M | 2+ | PTC-help (Jacob); overige eigen kennis |
+| Differentiaalvergelijkingen (rest) | `sbval`, `bvalfit` (randwaarden zonder Given-blok), `Stiffb`, `Jacob` (Radau is er sinds v1.7) | M | 2+ | PTC-help (Jacob); overige eigen kennis |
 | Speciale functies (rest) | Airy `Ai`, `Bi`, Bessel van niet-gehele orde, elliptische integralen | M | 2+ | PTC-help |
-| Data-analyse (rest) | `regress`, `loess`, lokaal minimum/maximum, uitschieters en NaN, PCA (`Nipals`), smoothing | L | 2+ | PTC-help |
+| Data-analyse (rest) | PCA (`Nipals`), `supsmooth` | L | 2+ | PTC-help |
 | Design of Experiments | ontwerpmatrices, factor screening, ANOVA, regressie, Monte Carlo | L | 2+ | PTC-help |
 | Financieel | contante waarde, toekomstige waarde, rente, betaling, intern rendement | S–M | 2+ | PTC-help |
-| Grafieken (rest) | 3D-plots, poolgrafieken, `CreateSpace`/`CreateMesh` | L | 3+ | PTC-help (Graphing) |
+| Grafieken (rest) | `CreateSpace`/`CreateMesh`, 3D-krommen en vectorvelden | L | 3+ | PTC-help (Graphing) |
 | Beeldverwerking | kleur, binarisatie, convolutie, morfologie, transformaties | L | 5+ | PTC-help; waarschijnlijk laag prioriteit |
 
 ## Interface en bediening
