@@ -8,6 +8,14 @@ use std::time::Instant;
 
 const WELKOM: &str = include_str!("welkom.rkn");
 
+/// Sjablonen voor Bestand → Nieuw uit sjabloon: (naam, inhoud).
+pub(crate) const SJABLONEN: [(&str, &str); 4] = [
+    ("Verslag", include_str!("sjablonen/verslag.rkn")),
+    ("Tentamen", include_str!("sjablonen/tentamen.rkn")),
+    ("Ligger op twee steunpunten", include_str!("sjablonen/ligger.rkn")),
+    ("Warmtebalans", include_str!("sjablonen/warmtebalans.rkn")),
+];
+
 /// Wat er moet gebeuren nadat de gebruiker over niet-opgeslagen wijzigingen heeft beslist.
 #[derive(Clone)]
 pub(crate) enum Pending {
@@ -461,7 +469,16 @@ impl App {
         };
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("Bestand", |ui| {
-                for a in [Action::Nieuw, Action::Openen, Action::Opslaan, Action::OpslaanAls] {
+                item(ui, &self.keymap, Action::Nieuw, &mut chosen);
+                ui.menu_button(format!("{}   Nieuw uit sjabloon", crate::icons::NEW), |ui| {
+                    for (name, text) in SJABLONEN {
+                        if ui.button(name).clicked() {
+                            ui.close();
+                            self.text_in_tab(text);
+                        }
+                    }
+                });
+                for a in [Action::Openen, Action::Opslaan, Action::OpslaanAls] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
                 if ui.button("Opslaan als Mathcad (.mcdx)…").clicked() {
@@ -642,6 +659,14 @@ pub(crate) fn recalc_sheet(sheet: &mut Sheet, old: &str, new: &str, force_full: 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sjablonen_rekenen_zonder_fouten() {
+        for (name, text) in SJABLONEN.iter().chain([("Welkom", WELKOM)].iter()) {
+            let sheet = Sheet::load(text);
+            assert_eq!(sheet.error_count(), 0, "{name}:\n{}", sheet.render());
+        }
+    }
 
     #[test]
     fn een_regel_wijzigen_rekent_alleen_de_afhankelijken_opnieuw() {

@@ -1,0 +1,22 @@
+@0,1 header Liggerberekening · {bestand}
+@0,2 footer {datum} · pagina {pagina} van {paginas}
+@0,4 # Ligger op twee steunpunten
+@0,7 " Gelijkmatig verdeelde last q over overspanning L. Pas de gegevens aan; de rest rekent mee.
+@0,10 ## Gegevens
+@0,12 q := 5 kN/m
+@22,12 L := 6 m
+@0,14 E := 210 GPa
+@22,14 I := 8360e4 mm^4
+@44,14 W := 557e3 mm^3
+@0,17 ## Krachten
+@0,19 R := q * L / 2
+@30,19 R = kN
+@0,21 M.max := q * L^2 / 8
+@30,21 M.max = kN*m
+@0,24 ## Spanning en doorbuiging
+@0,26 σ := M.max / W
+@30,26 σ = MPa
+@0,28 w(x) := q x (L^3 - 2 L x^2 + x^3) / (24 E I)
+@0,30 w(L / 2) = mm
+@30,30 L / 250 = mm
+@0,33 plot x = 0 m ; L : -w(x) = mm

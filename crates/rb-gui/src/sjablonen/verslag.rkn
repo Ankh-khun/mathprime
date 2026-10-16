@@ -1,0 +1,15 @@
+@0,1 header Verslag · {bestand}
+@0,2 footer {datum} · pagina {pagina} van {paginas}
+@0,4 # Titel van het verslag
+@0,7 " Naam · studentnummer · vak · datum
+@0,10 ## 1. Inleiding
+@0,12 " Wat wordt er berekend, en waarom?
+@0,15 ## 2. Gegevens
+@0,17 " Bekende waarden, met bron.
+@0,19 a := 1 m
+@0,22 ## 3. Berekening
+@0,24 " Stap voor stap, met eenheden.
+@0,26 b := 2 * a
+@0,28 b =
+@0,31 ## 4. Conclusie
+@0,33 " Wat betekent de uitkomst?

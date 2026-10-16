@@ -1,0 +1,19 @@
+@0,1 header Tentamen · naam · studentnummer
+@0,2 footer pagina {pagina} van {paginas}
+@0,4 # Tentamen
+@0,7 " Vak · datum · toegestane hulpmiddelen
+@0,10 area Vraag 1
+@0,12 " Gegeven:
+@0,14 F := 10 kN
+@0,17 " Gevraagd:
+@0,19 F =
+@0,21 area end
+@0,23 area Vraag 2
+@0,25 " Gegeven:
+@0,28 " Gevraagd:
+@0,31 area end
+@0,33 pagebreak
+@0,35 area Vraag 3
+@0,37 " Gegeven:
+@0,40 " Gevraagd:
+@0,43 area end
