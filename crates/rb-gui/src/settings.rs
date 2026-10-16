@@ -6,6 +6,7 @@ use crate::app::App;
 use crate::canvas::Background;
 use eframe::egui::{self, RichText};
 use crate::taal::t;
+use crate::update::Phase;
 
 /// Licht, donker of zoals Windows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -52,6 +53,9 @@ pub struct Settings {
     pub updates: bool,
     /// De interface in het Engels (taal.rs).
     pub english: bool,
+    /// Wachten op het scherm bij het tekenen (vsync). Uit: het venster volgt de muis direct bij
+    /// verplaatsen (met vsync bleef het op sommige systemen achter en gleed het na). Werkt na herstarten.
+    pub vsync: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +69,7 @@ impl Default for Settings {
             start_zoom: 1.5,
             updates: true,
             english: false,
+            vsync: false,
         }
     }
 }
@@ -73,7 +78,8 @@ impl Settings {
     /// Lees `instellingen.txt`; wat ontbreekt of niet klopt, houdt de standaardwaarde.
     pub fn parse(text: &str) -> Settings {
         let mut s = Settings::default();
-        for line in text.lines() {
+        // een BOM vooraan (Kladblok, PowerShell) hoort niet bij de eerste sleutel
+        for line in text.trim_start_matches('\u{feff}').lines() {
             let Some((k, v)) = line.split_once('=') else { continue };
             let v = v.trim();
             match k.trim() {
@@ -88,6 +94,7 @@ impl Settings {
                 "cijfers" => s.digits = v.parse::<usize>().map_or(6, |n| n.clamp(2, 15)),
                 "updates" => s.updates = v != "uit",
                 "taal" => s.english = v == "en",
+                "vsync" => s.vsync = v == "aan",
                 "zoom" => s.start_zoom = v.parse::<f32>().map_or(1.5, |z| z.clamp(0.6, 5.0)),
                 _ => {}
             }
@@ -97,7 +104,7 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\ntaal = {}\n",
+            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\ntaal = {}\nvsync = {}\n",
             self.thema.key(),
             self.background.key(),
             if self.start_welcome { "welkom" } else { "leeg" },
@@ -105,7 +112,8 @@ impl Settings {
             self.digits,
             self.start_zoom,
             if self.updates { "aan" } else { "uit" },
-            if self.english { "en" } else { "nl" }
+            if self.english { "en" } else { "nl" },
+            if self.vsync { "aan" } else { "uit" }
         )
     }
 }
@@ -182,7 +190,7 @@ impl App {
         let mut open = self.cv.show_settings;
         let before = self.cv.set.clone();
         let mut s = before.clone();
-        egui::Window::new(t("Instellingen")).open(&mut open).resizable(false).collapsible(false).fade_in(false).anchor(egui::Align2::CENTER_TOP, [0.0, 140.0]).show(ctx, |ui| {
+        egui::Window::new(t("Instellingen")).open(&mut open).resizable(false).collapsible(false).fade_in(false).anchor(egui::Align2::CENTER_TOP, [0.0, 90.0]).show(ctx, |ui| {
             ui.set_min_width(440.0);
             // een kop per onderdeel, de instellingen eronder in twee kolommen
             let section = |ui: &mut egui::Ui, icon: char, title: &str| {
@@ -244,6 +252,10 @@ impl App {
                 row_label(ui, "Automatisch aanvullen");
                 ui.checkbox(&mut s.autocomplete, t("lijst met namen tijdens het typen"));
                 ui.end_row();
+                row_label(ui, "Vsync");
+                ui.checkbox(&mut s.vsync, t("wachten op het scherm (na herstarten)"))
+                    .on_hover_text(t("Aan: geen scheuren in beeld. Uit: het venster volgt de muis direct bij verplaatsen."));
+                ui.end_row();
             });
 
             section(ui, crate::icons::REFRESH, "Updates");
@@ -252,6 +264,47 @@ impl App {
                 ui.checkbox(&mut s.updates, t("eens per dag kijken op GitHub"))
                     .on_hover_text(t("Vraagt alleen het nummer van de nieuwste versie op; er gaat niets van jou mee"));
                 ui.end_row();
+                row_label(ui, "Versie");
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(env!("CARGO_PKG_VERSION")).strong());
+                    let busy = matches!(self.upd.phase, Phase::Checking | Phase::Downloading(_) | Phase::Installing);
+                    if ui.add_enabled(!busy, egui::Button::new(t("Zoeken naar updates"))).clicked() {
+                        self.upd.check(ctx);
+                    }
+                });
+                ui.end_row();
+                let status = match &self.upd.phase {
+                    Phase::Idle => None,
+                    Phase::Checking => Some(t("Zoeken…").to_string()),
+                    Phase::Latest => Some(t("Je hebt de nieuwste versie.").to_string()),
+                    Phase::Failed(e) => Some(format!("{}: {e}", t("Niet gelukt"))),
+                    Phase::Newer(u) => Some(format!("{} {} {}", crate::taal::nl_en("Versie", "Version"), u.version, crate::taal::nl_en("is uit.", "is out."))),
+                    Phase::Downloading(u) => Some(format!("{} {}…", t("Downloaden van versie"), u.version)),
+                    Phase::Installing => Some(t("Installeren; MathPrime sluit en start opnieuw.").to_string()),
+                };
+                if let Some(text) = status {
+                    ui.label("");
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new(text).color(crate::icons::ACCENT));
+                        if let Phase::Newer(u) = self.upd.phase.clone() {
+                            ui.horizontal(|ui| {
+                                if u.setup.is_some() && ui.button(t("Downloaden en installeren")).on_hover_text(t("Open werk wordt eerst gevraagd op te slaan")).clicked() {
+                                    self.upd.download(ctx);
+                                }
+                                if ui.button(t("Wat is nieuw")).clicked() {
+                                    ctx.open_url(egui::OpenUrl::new_tab(&u.url));
+                                }
+                            });
+                        }
+                    });
+                    ui.end_row();
+                }
+                row_label(ui, "Over");
+                ui.horizontal(|ui| {
+                    ui.label(t("MIT-licentie ·"));
+                    ui.hyperlink_to("GitHub", "https://github.com/Ankh-khun/mathprime");
+                });
+                ui.end_row();
             });
             ui.add_space(10.0);
             ui.label(RichText::new(t("Wijzigingen werken meteen. Sneltoetsen staan in keymap.txt (Help → Sneltoetsen).")).small().weak());
@@ -259,8 +312,12 @@ impl App {
         self.cv.show_settings = open;
         if s != before {
             let digits_changed = s.digits != before.digits;
+            let language_changed = s.english != before.english;
             crate::taal::set_english(s.english);
             self.cv.set = s;
+            if language_changed {
+                self.load_library();
+            }
             self.apply_theme(ctx);
             if digits_changed {
                 rb_units::set_significant_digits(self.cv.set.digits);
@@ -277,12 +334,14 @@ mod tests {
 
     #[test]
     fn lezen_en_schrijven() {
-        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false, english: true };
+        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false, english: true, vsync: true };
         assert_eq!(Settings::parse(&s.to_text()), s);
         // een oud bestand: alleen thema en achtergrond, de rest standaard
         let old = Settings::parse("# Instellingen van MathPrime\nachtergrond = ruitjes\nthema = donker\n");
         assert_eq!(old, Settings { thema: Thema::Donker, background: Background::Ruitjes, ..Settings::default() });
         // onzin wordt de standaard
         assert_eq!(Settings::parse("cijfers = veel\nzoom = x\nthema = paars"), Settings::default());
+        // een BOM vooraan (Kladblok, PowerShell)
+        assert!(Settings::parse("\u{feff}taal = en\n").english);
     }
 }

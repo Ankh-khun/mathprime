@@ -137,7 +137,7 @@ pub fn ribbon_group<R>(ui: &mut Ui, title: &str, add: impl FnOnce(&mut Ui) -> R)
 /// Een tabblad van het lint: tekst met een streep eronder als het actief is.
 pub fn underline_tab(ui: &mut Ui, label: &str, on: bool) -> Response {
     let text = if on { RichText::new(label).strong() } else { RichText::new(label).color(ui.visuals().weak_text_color()) };
-    let resp = ui.add(egui::Label::new(text.size(14.0)).sense(Sense::click()));
+    let resp = ui.add(egui::Label::new(text.size(14.0)).selectable(false).sense(Sense::click())).on_hover_cursor(egui::CursorIcon::PointingHand);
     let y = resp.rect.bottom() + 4.0;
     if on {
         ui.painter().hline(resp.rect.left()..=resp.rect.right(), y, Stroke::new(2.0, ACCENT));

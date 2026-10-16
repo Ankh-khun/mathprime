@@ -1550,6 +1550,8 @@ impl App {
                 }
                 s.spacing.button_padding = egui::vec2(8.0, 4.0);
                 s.spacing.menu_margin = egui::Margin::same(8);
+                // labels zijn geen tekstvak: geen I-cursor op het lint en in vensters
+                s.interaction.selectable_labels = false;
             });
         }
     }
@@ -1560,7 +1562,7 @@ impl App {
             Ins::Library => self.lib.show = !self.lib.show,
             Ins::Solve(var) => {
                 let Some((l, r)) = self.current_equation() else {
-                    self.status = "Klik eerst op een formule (zoals F == m * a of F := m * a)".into();
+                    self.status = crate::taal::t("Klik eerst op een formule, zoals F == m * a of F := m * a").into();
                     return;
                 };
                 // het kruisje onder de formule
@@ -1576,9 +1578,9 @@ impl App {
                 let numeric = lines.iter().any(|l| l == "Given");
                 self.insert_lines(ctx, lines);
                 self.status = if numeric {
-                    format!("{var} staat er meer dan eens in: numeriek opgelost met een solve block (pas de beginwaarde aan)")
+                    if crate::taal::english() { format!("{var} occurs more than once: solved numerically with a solve block (adjust the initial value)") } else { format!("{var} staat er meer dan eens in: numeriek opgelost met een solve block (pas de beginwaarde aan)") }
                 } else {
-                    format!("Omgewerkt naar {var}")
+                    format!("{} {var}", crate::taal::nl_en("Omgewerkt naar", "Rearranged for"))
                 };
             }
             Ins::Image => {

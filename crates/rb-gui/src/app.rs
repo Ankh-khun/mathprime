@@ -76,8 +76,8 @@ pub struct App {
     pub(crate) find: Option<crate::find::FindState>,
     pub(crate) last_autosave: Instant,
     /// Een nieuwere versie op GitHub (update.rs): eerst het antwoord van de achtergrondtaak, dan de melding.
-    update_rx: Option<std::sync::mpsc::Receiver<crate::update::Update>>,
-    update: Option<crate::update::Update>,
+    /// Zoeken naar en installeren van een nieuwere versie (update.rs).
+    pub(crate) upd: crate::update::State,
     /// Schermafdruk voor tests (MATHPRIME_SCREENSHOT).
     shot: Option<crate::shot::Shot>,
 }
@@ -124,8 +124,7 @@ impl App {
             recovery: None,
             find: None,
             last_autosave: Instant::now(),
-            update_rx: None,
-            update: None,
+            upd: Default::default(),
             shot: crate::shot::Shot::from_env(),
         };
         app.load_settings();
@@ -133,7 +132,7 @@ impl App {
         app.check_recovery();
         if app.cv.set.updates && app.shot.is_none() {
             let dir = app.keymap.path.as_ref().and_then(|p| p.parent()).map(|d| d.to_path_buf());
-            app.update_rx = crate::update::start(dir, cc.egui_ctx.clone());
+            app.upd.daily(dir, &cc.egui_ctx);
         }
         if let Some(i) = &app.inbox {
             i.set_ctx(&cc.egui_ctx);
@@ -517,6 +516,12 @@ impl App {
                 for a in [Action::Help, Action::Sneltoetsen, Action::Welkomstblad] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
+                ui.separator();
+                if ui.button(format!("{}   {}", crate::icons::REFRESH, t("Zoeken naar updates…"))).clicked() {
+                    self.upd.check(ctx);
+                    self.cv.show_settings = true;
+                    ui.close();
+                }
             });
         });
         if let Some(a) = chosen {
@@ -765,6 +770,13 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = &ui.ctx().clone();
 
+        // een gedownloade nieuwe versie: setup starten en afsluiten (met de gewone vraag om op te slaan)
+        if let Some(setup) = self.upd.poll() {
+            match crate::update::run_setup(&setup) {
+                Ok(()) => ctx.send_viewport_cmd(ViewportCommand::Close),
+                Err(e) => self.upd.phase = crate::update::Phase::Failed(e.to_string()),
+            }
+        }
         // bestanden van een tweede start (dubbelklik in de Verkenner): een tabblad, en naar voren
         let requests = self.inbox.as_ref().map(|i| i.take()).unwrap_or_default();
         if !requests.is_empty() {
@@ -858,10 +870,6 @@ impl eframe::App for App {
                 }
                 ui.add_space(8.0);
                 ui.label(RichText::new(format!("{n} {}  ·  {}", crate::taal::nl_en("regio's", "regions"), self.status)).weak());
-                if let Some(u) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
-                    self.update = Some(u);
-                    self.update_rx = None;
-                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let plain = |s: String| egui::Button::new(RichText::new(s).size(14.0)).frame_when_inactive(false);
                     if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text(t("Groter (Ctrl+wiel)")).clicked() {
@@ -873,12 +881,12 @@ impl eframe::App for App {
                     if ui.add(plain(crate::icons::ZOOM_OUT.to_string())).on_hover_text(t("Kleiner (Ctrl+wiel)")).clicked() {
                         self.run(ctx, Action::Kleiner);
                     }
-                    if let Some(u) = &self.update {
+                    if let Some(u) = self.upd.newer() {
                         ui.add_space(12.0);
                         let text = RichText::new(format!("{}  {} {} {}", crate::icons::REFRESH, crate::taal::nl_en("Versie", "Version"), u.version, crate::taal::nl_en("is uit", "is out"))).color(crate::icons::ACCENT);
                         let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
-                        if r.on_hover_text(t("Naar de downloadpagina")).clicked() {
-                            ctx.open_url(egui::OpenUrl::new_tab(&u.url));
+                        if r.on_hover_text(t("Bijwerken in Instellingen")).clicked() {
+                            self.cv.show_settings = true;
                         }
                     }
                 });

@@ -11,6 +11,7 @@ members = [
     "crates/rb-export",
     "crates/rb-cli",
     "crates/rb-gui",
+    "crates/rb-setup",
 ]
 
 [workspace.package]

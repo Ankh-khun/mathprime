@@ -37,9 +37,17 @@ fn main() -> eframe::Result {
                 width: 128,
                 height: 128,
             })),
+        glow_options: eframe::egui_glow::GlowConfiguration { vsync: vsync_setting(), ..Default::default() },
         ..Default::default()
     };
     let result = eframe::run_native("MathPrime", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, file, inbox)))));
     instance::stop();
     result
+}
+
+/// Vsync uit instellingen.txt (standaard uit); nodig vóór het venster er is.
+fn vsync_setting() -> bool {
+    keymap::config_dir()
+        .and_then(|d| std::fs::read_to_string(d.join("instellingen.txt")).ok())
+        .is_some_and(|t| settings::Settings::parse(&t).vsync)
 }

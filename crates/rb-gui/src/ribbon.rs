@@ -309,7 +309,9 @@ const FUNCTIONS: &[(&str, &[&str])] = &[
     ("Machten en logaritmen", &["sqrt(", "nthroot(", "exp(", "ln(", "log(", "log2("]),
     ("Afronden", &["round(", "floor(", "ceil(", "trunc(", "mod(", "abs(", "sign(", "min(", "max("]),
     ("Statistiek", &["mean(", "median(", "stdev(", "var(", "pnorm(", "qnorm(", "linfit(", "slope(", "intercept(", "regress(", "loess(", "ksmooth(", "medsmooth(", "localmax(", "localmin(", "filterNaN("]),
-    ("Oplossen", &["root(", "polyroots(", "Find(", "Minerr(", "Minimize(", "Maximize(", "rkfixed(", "Radau(", "odesolve("]),
+    ("Oplossen", &["root(", "polyroots(", "Find(", "Minerr(", "Minimize(", "Maximize(", "rkfixed(", "Radau(", "odesolve(", "sbval(", "bvalfit(", "Stiffb("]),
+    ("Speciale functies", &["erf(", "Γ(", "Jn(", "Yn(", "In(", "Kn(", "js(", "ys(", "Ai(", "Bi("]),
+    ("Financieel", &["pv(", "fv(", "pmt(", "nper(", "rate(", "npv(", "irr(", "mirr(", "eff(", "nom(", "cumint(", "cumprinc("]),
     ("Interpolatie", &["linterp(", "cspline(", "interp("]),
     ("Tekst", &["concat(", "strlen(", "substr(", "search(", "num2str(", "str2num("]),
     ("Bestanden (Excel, CSV)", &["READEXCEL(", "READCSV(", "READFILE(", "WRITEEXCEL(", "WRITECSV(", "WRITEFILE("]),
@@ -447,9 +449,9 @@ impl App {
                 *chosen = Some(Ins::Library);
             }
             let resp = icons::ribbon_button(ui, &icons::REFRESH.to_string(), tr("Omwerken ▾"), false).on_hover_text(if vars.is_empty() {
-                "Klik eerst op een formule, zoals F == m * a of F := m * a"
+                tr("Klik eerst op een formule, zoals F == m * a of F := m * a")
             } else {
-                "De formule waar je in staat oplossen naar een andere grootheid"
+                tr("De formule waar je in staat oplossen naar een andere grootheid")
             });
             egui::Popup::menu(&resp).show(|ui| {
                 if vars.is_empty() {

@@ -33,4 +33,4 @@ jobs:
       - name: Release-build zonder warnings
         env:
           RUSTFLAGS: -D warnings
-        run: cargo build --release -p rb-gui -p rb-cli
+        run: cargo build --release -p rb-gui -p rb-cli -p rb-setup

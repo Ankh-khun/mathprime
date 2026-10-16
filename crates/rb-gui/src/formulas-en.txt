@@ -1,0 +1,100 @@
+# MathPrime formula library (English)
+#
+# Per line: name | equation (with ==) | quantity: description [unit]; ...
+# A line starting with "## " is a category. The unit is an example for the input value.
+# The equations and names are the same as in formules.txt (Dutch); only the texts differ.
+# Your own formulas go in formules.txt in the settings folder, in the same format.
+
+## Mechanics
+Newton's second law | F == m * a | F: force [N]; m: mass [kg]; a: acceleration [m/s^2]
+Weight | F.z == m * g | F.z: weight [N]; m: mass [kg]
+Work | W == F * s | W: work [J]; F: force [N]; s: displacement [m]
+Power | P == W / t | P: power [kW]; W: work [J]; t: time [s]
+Power at speed | P == F * v | P: power [W]; F: force [N]; v: speed [m/s]
+Kinetic energy | E.k == 1/2 * m * v^2 | E.k: kinetic energy [J]; m: mass [kg]; v: speed [m/s]
+Potential energy | E.p == m * g * h | E.p: potential energy [J]; m: mass [kg]; h: height [m]
+Momentum | p == m * v | p: momentum [N*s]; m: mass [kg]; v: speed [m/s]
+Uniformly accelerated motion | s == v.0 * t + 1/2 * a * t^2 | s: distance [m]; v.0: initial speed [m/s]; t: time [s]; a: acceleration [m/s^2]
+Speed after accelerating | v == v.0 + a * t | v: final speed [m/s]; v.0: initial speed [m/s]; a: acceleration [m/s^2]; t: time [s]
+Moment | M == F * r | M: moment [N*m]; F: force [N]; r: arm [m]
+Angular velocity from rotational speed | ω == 2 * π * n | ω: angular velocity [rad/s]; n: rotational speed [1/s]
+Circumferential speed | v == ω * r | v: speed [m/s]; ω: angular velocity [rad/s]; r: radius [m]
+Shaft power | P == M * ω | P: power [W]; M: torque [N*m]; ω: angular velocity [rad/s]
+Centripetal force | F.c == m * v^2 / r | F.c: force [N]; m: mass [kg]; v: speed [m/s]; r: radius [m]
+Spring force | F == k * u | F: force [N]; k: spring constant [N/m]; u: compression [m]
+Friction | F.w == μ * F.n | F.w: friction force [N]; μ: friction coefficient [1]; F.n: normal force [N]
+Efficiency | η == P.uit / P.in | η: efficiency [1]; P.uit: useful power [W]; P.in: input power [W]
+
+## Strength of materials
+Normal stress | σ == F / A | σ: stress [MPa]; F: force [kN]; A: area [mm^2]
+Bending stress | σ == M / W | σ: stress [MPa]; M: bending moment [kN*m]; W: section modulus [mm^3]
+Shear stress | τ == F / A | τ: shear stress [MPa]; F: shear force [kN]; A: area [mm^2]
+Torsional stress | τ == T / W.p | τ: shear stress [MPa]; T: torque [N*m]; W.p: polar section modulus [mm^3]
+Strain | ε == ΔL / L | ε: strain [1]; ΔL: elongation [mm]; L: length [m]
+Hooke's law | σ == E * ε | σ: stress [MPa]; E: modulus of elasticity [GPa]; ε: strain [1]
+Elongation of a bar | ΔL == F * L / (E * A) | ΔL: elongation [mm]; F: force [kN]; L: length [m]; E: modulus of elasticity [GPa]; A: area [mm^2]
+Section modulus rectangle | W == b * h^2 / 6 | W: section modulus [mm^3]; b: width [mm]; h: height [mm]
+Second moment of area rectangle | I == b * h^3 / 12 | I: second moment of area [mm^4]; b: width [mm]; h: height [mm]
+Second moment of area circle | I == π * d^4 / 64 | I: second moment of area [mm^4]; d: diameter [mm]
+Max. moment beam, distributed load | M == q * L^2 / 8 | M: moment [kN*m]; q: distributed load [kN/m]; L: span [m]
+Max. moment beam, point load at midspan | M == F * L / 4 | M: moment [kN*m]; F: point load [kN]; L: span [m]
+Deflection beam, distributed load | w == 5 * q * L^4 / (384 * E * I) | w: deflection [mm]; q: distributed load [kN/m]; L: span [m]; E: modulus of elasticity [GPa]; I: second moment of area [mm^4]
+Deflection beam, point load at midspan | w == F * L^3 / (48 * E * I) | w: deflection [mm]; F: point load [kN]; L: span [m]; E: modulus of elasticity [GPa]; I: second moment of area [mm^4]
+Deflection cantilever, point load | w == F * L^3 / (3 * E * I) | w: deflection [mm]; F: point load [kN]; L: length [m]; E: modulus of elasticity [GPa]; I: second moment of area [mm^4]
+Buckling load (Euler) | F.k == π^2 * E * I / L.k^2 | F.k: buckling load [kN]; E: modulus of elasticity [GPa]; I: second moment of area [mm^4]; L.k: buckling length [m]
+Von Mises | σ.v == sqrt(σ^2 + 3 * τ^2) | σ.v: equivalent stress [MPa]; σ: normal stress [MPa]; τ: shear stress [MPa]
+
+## Fluids and gases
+Hydrostatic pressure | p == ρ * g * h | p: pressure [kPa]; ρ: density [kg/m^3]; h: depth [m]
+Pressure | p == F / A | p: pressure [kPa]; F: force [N]; A: area [m^2]
+Flow rate | Q == A * v | Q: flow rate [m^3/s]; A: cross-section [m^2]; v: speed [m/s]
+Buoyancy (Archimedes) | F.op == ρ * g * V | F.op: buoyant force [N]; ρ: density [kg/m^3]; V: volume [m^3]
+Reynolds number | Re == ρ * v * D / μ | Re: Reynolds number [1]; ρ: density [kg/m^3]; v: speed [m/s]; D: diameter [m]; μ: dynamic viscosity [Pa*s]
+Dynamic pressure | p.d == 1/2 * ρ * v^2 | p.d: dynamic pressure [Pa]; ρ: density [kg/m^3]; v: speed [m/s]
+Outflow speed (Torricelli) | v == sqrt(2 * g * h) | v: speed [m/s]; h: height difference [m]
+Pump power | P == ρ * g * Q * H / η | P: power [kW]; ρ: density [kg/m^3]; Q: flow rate [m^3/s]; H: head [m]; η: efficiency [1]
+
+## Thermodynamics
+Ideal gas law | p * V == m * R.s * T | p: pressure [bar]; V: volume [m^3]; m: mass [kg]; R.s: specific gas constant [J/(kg*K)]; T: temperature [K]
+Heat | Q == m * c * ΔT | Q: heat [kJ]; m: mass [kg]; c: specific heat [J/(kg*K)]; ΔT: temperature difference [K]
+First law | ΔU == Q - W | ΔU: change in internal energy [kJ]; Q: heat added [kJ]; W: work done [kJ]
+Carnot efficiency | η == 1 - T.k / T.w | η: efficiency [1]; T.k: cold reservoir temperature [K]; T.w: hot reservoir temperature [K]
+Isentropic process | p.1 / p.2 == (V.2 / V.1)^κ | p.1: initial pressure [bar]; V.1: initial volume [m^3]; κ: isentropic exponent [1]; p.2: final pressure [bar]; V.2: final volume [m^3]
+Isentropic temperature | T.2 == T.1 * (p.2 / p.1)^((κ - 1) / κ) | T.2: final temperature [K]; T.1: initial temperature [K]; p.2: final pressure [bar]; p.1: initial pressure [bar]; κ: isentropic exponent [1]
+Heat conduction | Φ == λ * A * ΔT / d | Φ: heat flow [W]; λ: thermal conductivity [W/(m*K)]; A: area [m^2]; ΔT: temperature difference [K]; d: thickness [m]
+Heat transfer | Φ == U * A * ΔT | Φ: heat flow [W]; U: overall heat transfer coefficient [W/(m^2*K)]; A: area [m^2]; ΔT: temperature difference [K]
+Heat flow with mass flow | Φ == m.dot * c * ΔT | Φ: heat flow [kW]; m.dot: mass flow [kg/s]; c: specific heat [J/(kg*K)]; ΔT: temperature difference [K]
+
+## Electrical engineering
+Ohm's law | U == I * R | U: voltage [V]; I: current [A]; R: resistance [Ω]
+Electric power | P == U * I | P: power [W]; U: voltage [V]; I: current [A]
+Power in a resistor | P == I^2 * R | P: power [W]; I: current [A]; R: resistance [Ω]
+Resistance of a wire | R == ρ.e * L / A | R: resistance [Ω]; ρ.e: resistivity [Ω*m]; L: length [m]; A: cross-section [mm^2]
+Two resistors in parallel | R.v == R.1 * R.2 / (R.1 + R.2) | R.v: equivalent resistance [Ω]; R.1: resistor 1 [Ω]; R.2: resistor 2 [Ω]
+Energy | E == P * t | E: energy [kW*hr]; P: power [kW]; t: time [hr]
+Capacitor charge | Q == C * U | Q: charge [µC]; C: capacitance [µF]; U: voltage [V]
+Frequency and period | f == 1 / T | f: frequency [Hz]; T: period [s]
+Inductive reactance | X.L == 2 * π * f * L | X.L: reactance [Ω]; f: frequency [Hz]; L: inductance [mH]
+Capacitive reactance | X.C == 1 / (2 * π * f * C) | X.C: reactance [Ω]; f: frequency [Hz]; C: capacitance [µF]
+Three-phase power | P == sqrt(3) * U * I * cosφ | P: power [kW]; U: line voltage [V]; I: line current [A]; cosφ: power factor [1]
+Synchronous speed | n.s == 60 * f / p | n.s: rotational speed [1/min]; f: grid frequency [Hz]; p: number of pole pairs [1]
+Slip | s == (n.s - n) / n.s | s: slip [1]; n.s: synchronous speed [1/min]; n: rotational speed [1/min]
+
+## Geometry
+Pythagorean theorem | c == sqrt(a^2 + b^2) | c: hypotenuse [m]; a: side a [m]; b: side b [m]
+Area of a circle | A == π * r^2 | A: area [m^2]; r: radius [m]
+Area of a circle from diameter | A == π * d^2 / 4 | A: area [mm^2]; d: diameter [mm]
+Circumference of a circle | O == 2 * π * r | O: circumference [m]; r: radius [m]
+Volume of a cylinder | V == π * r^2 * h | V: volume [m^3]; r: radius [m]; h: height [m]
+Volume of a sphere | V == 4/3 * π * r^3 | V: volume [m^3]; r: radius [m]
+Surface area of a sphere | A == 4 * π * r^2 | A: area [m^2]; r: radius [m]
+Volume of a cone | V == 1/3 * π * r^2 * h | V: volume [m^3]; r: radius [m]; h: height [m]
+Opposite side | a == c * sin(α) | a: opposite side [m]; c: hypotenuse [m]; α: angle [deg]
+Adjacent side | b == c * cos(α) | b: adjacent side [m]; c: hypotenuse [m]; α: angle [deg]
+
+## Wind and energy
+Wind power | P == 1/2 * ρ * A * v^3 * C.p | P: power [W]; ρ: air density [kg/m^3]; A: rotor area [m^2]; v: wind speed [m/s]; C.p: power coefficient [1]
+Rotor area | A == π * D^2 / 4 | A: rotor area [m^2]; D: rotor diameter [m]
+Tip speed ratio (TSR) | λ == ω * R / v | λ: tip speed ratio [1]; ω: rotor angular velocity [rad/s]; R: rotor radius [m]; v: wind speed [m/s]
+Betz limit | C.p == 16 / 27 | C.p: power coefficient [1]
+Overall efficiency of a chain | η.tot == η.1 * η.2 * η.3 | η.tot: overall efficiency [1]; η.1: efficiency 1 [1]; η.2: efficiency 2 [1]; η.3: efficiency 3 [1]

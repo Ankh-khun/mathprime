@@ -2327,6 +2327,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rb-setup"
+version = "1.7.0"
+dependencies = [
+ "eframe",
+ "rb-zipxml",
+ "rfd",
+]
+
+[[package]]
 name = "rb-sheet"
 version = "1.7.0"
 dependencies = [

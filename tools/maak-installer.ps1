@@ -3,10 +3,11 @@
     Maakt het installatiepakket target\installer\MathPrime-<versie>-setup.exe.
 
 .DESCRIPTION
-    Bouwt mathprime en mathprime-cli (release), zet ze met tools\installer\install.ps1 en
-    uninstall.ps1, de README en de voorbeelden in een map, en pakt die in met IExpress (zit in
-    Windows; niets te downloaden). Het pakket pakt zichzelf uit in een tijdelijke map en start
-    install.ps1: installeren voor de huidige gebruiker, zonder beheerdersrechten.
+    Bouwt mathprime, mathprime-cli en mathprime-setup (release), zet de programma's met
+    tools\installer\install.ps1 en uninstall.ps1, de README en de voorbeelden in een map, en plakt die
+    als ZIP achter mathprime-setup.exe (mathprime-setup --pak). Het installatieprogramma (crates\rb-setup)
+    toont een venster, pakt uit in een tijdelijke map en start install.ps1: installeren voor de huidige
+    gebruiker, zonder beheerdersrechten. /Q installeert zonder venster.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File tools\maak-installer.ps1
@@ -18,7 +19,7 @@ $versie = (Select-String -Path (Join-Path $root "Cargo.toml") -Pattern '^version
 
 if (-not $NietBouwen) {
     Push-Location $root
-    cargo build --release -p rb-gui -p rb-cli
+    cargo build --release -p rb-gui -p rb-cli -p rb-setup
     $ok = $?
     Pop-Location
     if (-not $ok) { throw "cargo build mislukt (draait mathprime.exe uit target\release nog?)" }
@@ -44,49 +45,9 @@ foreach ($v in Get-ChildItem (Join-Path $root "examples") -Filter "*.rkn") {
 }
 
 $exe = Join-Path $uit "MathPrime-$versie-setup.exe"
-$files = Get-ChildItem $pakket -File
-$sed = @"
-[Version]
-Class=IEXPRESS
-SEDVersion=3
-[Options]
-PackagePurpose=InstallApp
-ShowInstallProgramWindow=1
-HideExtractAnimation=1
-UseLongFileName=1
-InsideCompressed=0
-CAB_FixedSize=0
-CAB_ResvCodeSigning=0
-RebootMode=N
-InstallPrompt=%InstallPrompt%
-DisplayLicense=%DisplayLicense%
-FinishMessage=%FinishMessage%
-TargetName=%TargetName%
-FriendlyName=%FriendlyName%
-AppLaunched=%AppLaunched%
-PostInstallCmd=%PostInstallCmd%
-AdminQuietInstCmd=%AdminQuietInstCmd%
-UserQuietInstCmd=%UserQuietInstCmd%
-SourceFiles=SourceFiles
-[Strings]
-InstallPrompt=
-DisplayLicense=
-FinishMessage=
-TargetName=$exe
-FriendlyName=MathPrime $versie
-AppLaunched=powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File install.ps1
-PostInstallCmd=<None>
-AdminQuietInstCmd=powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1 -Stil
-UserQuietInstCmd=powershell.exe -NoProfile -ExecutionPolicy Bypass -File install.ps1 -Stil
-"@
-for ($k = 0; $k -lt $files.Count; $k++) { $sed += "`r`nFILE$k=`"$($files[$k].Name)`"" }
-$sed += "`r`n[SourceFiles]`r`nSourceFiles0=$pakket\`r`n[SourceFiles0]"
-for ($k = 0; $k -lt $files.Count; $k++) { $sed += "`r`n%FILE$k%=" }
-$sed = $sed -replace "`r?`n", "`r`n"   # IExpress wil overal CRLF
-$sedPad = Join-Path $uit "mathprime.sed"
-Set-Content $sedPad $sed -Encoding ascii
-
 if (Test-Path $exe) { Remove-Item $exe -Force }
-$p = Start-Process -FilePath "$env:SystemRoot\System32\iexpress.exe" -ArgumentList "/N", "/Q", $sedPad -Wait -PassThru
-if (-not (Test-Path $exe)) { throw "IExpress maakte geen pakket (code $($p.ExitCode)); zie $sedPad" }
+$setup = Join-Path $root "target\release\mathprime-setup.exe"
+# een venster-programma: met Start-Process -Wait op het einde wachten
+$p = Start-Process -FilePath $setup -ArgumentList "--pak", "`"$pakket`"", "`"$exe`"" -Wait -PassThru -NoNewWindow
+if ($p.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "mathprime-setup --pak maakte geen pakket (code $($p.ExitCode))" }
 "installatiepakket: $exe ({0:N1} MB)" -f ((Get-Item $exe).Length / 1MB)

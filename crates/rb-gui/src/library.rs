@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 const BUILTIN: &str = include_str!("formules.txt");
+const BUILTIN_EN: &str = include_str!("formulas-en.txt");
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Var {
@@ -95,7 +96,7 @@ pub fn parse(text: &str, own: bool) -> Vec<Formula> {
 }
 
 pub fn builtin() -> Vec<Formula> {
-    parse(BUILTIN, false)
+    parse(if crate::taal::english() { BUILTIN_EN } else { BUILTIN }, false)
 }
 
 pub fn load_own(dir: &Path) -> Vec<Formula> {
@@ -182,7 +183,7 @@ pub fn solve_lines(lhs: &Expr, rhs: &Expr, target: &str, unit_of: &dyn Fn(&str) 
             let l = rb_edit::convert::expr_text(lhs);
             let r = rb_edit::convert::expr_text(rhs);
             // de beginwaarde vóór de invoer, want een invoernaam kan een eenheid overschaduwen (s, m)
-            lines.insert(0, format!("{target} := {} // beginwaarde", value_text(&unit)));
+            lines.insert(0, format!("{target} := {} // {}", value_text(&unit), crate::taal::nl_en("beginwaarde", "initial value")));
             lines.push("Given".into());
             lines.push(format!("{l} == {r}"));
             let show = if unit.is_empty() || unit == "1" { String::new() } else { format!(" {unit}") };
@@ -220,6 +221,19 @@ mod tests {
             for q in f.quantities() {
                 assert!(f.var(&q).is_some(), "{}: '{q}' zonder omschrijving", f.name);
             }
+        }
+    }
+
+    /// De Engelse bibliotheek heeft dezelfde formules (vergelijkingen, namen en eenheden) als de Nederlandse.
+    #[test]
+    fn engelse_bibliotheek_gelijk_aan_nederlandse() {
+        let (nl, en) = (parse(BUILTIN, false), parse(BUILTIN_EN, false));
+        assert_eq!(nl.len(), en.len());
+        for (a, b) in nl.iter().zip(&en) {
+            assert_eq!(a.eq, b.eq, "{} / {}", a.name, b.name);
+            let names = |f: &Formula| f.vars.iter().map(|v| (v.name.clone(), v.unit.clone())).collect::<Vec<_>>();
+            assert_eq!(names(a), names(b), "{} / {}", a.name, b.name);
+            assert!(b.vars.iter().all(|v| !v.what.is_empty()), "{}", b.name);
         }
     }
 
@@ -320,6 +334,8 @@ impl App {
     }
 
     pub(crate) fn load_library(&mut self) {
+        // de ingebouwde formules in de taal van de interface
+        self.lib.builtin = builtin();
         if let Some(d) = self.library_dir() {
             self.lib.own = load_own(&d);
         }
@@ -332,9 +348,9 @@ impl App {
 
     pub(crate) fn library_panel(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.heading("Formules");
+            ui.heading(t("Formules"));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("Sluiten").clicked() {
+                if ui.small_button(t("Sluiten")).clicked() {
                     self.lib.show = false;
                 }
             });
@@ -344,7 +360,7 @@ impl App {
             .on_hover_text(t("Grootheden die het blad nog niet kent, krijgen een regel met waarde 1 en een eenheid"));
         if ui.button(t("+ Eigen formule opslaan…")).clicked() {
             let eq = self.current_equation().map(|(l, r)| format!("{} == {}", rb_edit::convert::expr_text(&l), rb_edit::convert::expr_text(&r))).unwrap_or_default();
-            self.lib.form = Some(Form { name: String::new(), category: "Eigen formules".into(), eq, vars: String::new(), error: None });
+            self.lib.form = Some(Form { name: String::new(), category: t("Eigen formules").into(), eq, vars: String::new(), error: None });
         }
         ui.separator();
         let q = self.lib.search.to_lowercase();
@@ -385,7 +401,7 @@ impl App {
                                         act = Some(Act::Solve(f.clone(), name));
                                     }
                                 }
-                                if ui.small_button("als uitleg").on_hover_text(t("De formule alleen tonen (niet uitrekenen)")).clicked() {
+                                if ui.small_button(t("als uitleg")).on_hover_text(t("De formule alleen tonen (niet uitrekenen)")).clicked() {
                                     act = Some(Act::Show(f.clone()));
                                 }
                             });
@@ -401,7 +417,7 @@ impl App {
             Some(Act::Solve(f, name)) => {
                 let lines = formula_lines(&f, &name, self.lib.with_inputs, &self.defined_names());
                 self.insert_lines(ctx, lines);
-                self.status = format!("{}: opgelost naar {name}", f.name);
+                self.status = format!("{}: {} {name}", f.name, crate::taal::nl_en("opgelost naar", "solved for"));
             }
             Some(Act::Show(f)) => self.insert_lines(ctx, vec![f.eq.clone()]),
             Some(Act::Delete(f)) => {
@@ -415,7 +431,7 @@ impl App {
     fn save_library(&mut self) {
         if let Some(d) = self.library_dir() {
             if let Err(e) = save_own(&d, &self.lib.own) {
-                self.status = format!("Kan de eigen formules niet opslaan: {e}");
+                self.status = format!("{}: {e}", crate::taal::nl_en("Kan de eigen formules niet opslaan", "Cannot save your own formulas"));
             }
         }
     }
@@ -437,7 +453,7 @@ impl App {
                 ui.add(egui::TextEdit::singleline(&mut form.eq).hint_text(t("F == m * a")).font(egui::TextStyle::Monospace));
                 ui.end_row();
                 ui.label(t("Grootheden"));
-                ui.add(egui::TextEdit::multiline(&mut form.vars).hint_text("F: kracht [N]\nm: massa [kg]\na: versnelling [m/s^2]").desired_rows(4));
+                ui.add(egui::TextEdit::multiline(&mut form.vars).hint_text(crate::taal::nl_en("F: kracht [N]\nm: massa [kg]\na: versnelling [m/s^2]", "F: force [N]\nm: mass [kg]\na: acceleration [m/s^2]")).desired_rows(4));
                 ui.end_row();
             });
             ui.label(RichText::new(t("Per grootheid: naam: omschrijving [eenheid]. Optioneel; de eenheid wordt gebruikt voor de invoerwaarden.")).small());
@@ -452,15 +468,15 @@ impl App {
             let form = self.lib.form.as_mut().expect("formulier");
             let ok = parse_expr_str(&form.eq).ok().as_ref().and_then(expr_sides).is_some();
             if form.name.trim().is_empty() {
-                form.error = Some("Geef de formule een naam.".into());
+                form.error = Some(crate::taal::nl_en("Geef de formule een naam.", "Give the formula a name.").into());
             } else if !ok {
-                form.error = Some("De vergelijking moet de vorm 'links == rechts' hebben (Ctrl+= op het werkblad).".into());
+                form.error = Some(crate::taal::nl_en("De vergelijking moet de vorm 'links == rechts' hebben (Ctrl+= op het werkblad).", "The equation must have the form 'left == right' (Ctrl+= on the worksheet).").into());
             } else {
                 let vars_text = form.vars.lines().collect::<Vec<_>>().join("; ");
                 let line = format!("{} | {} | {}", form.name.trim(), form.eq.trim(), vars_text);
                 let mut f = parse(&line, true).pop().expect("formule");
-                f.category = if form.category.trim().is_empty() { "Eigen formules".into() } else { form.category.trim().to_string() };
-                self.status = format!("Opgeslagen in de bibliotheek: {}", f.name);
+                f.category = if form.category.trim().is_empty() { t("Eigen formules").into() } else { form.category.trim().to_string() };
+                self.status = format!("{}: {}", crate::taal::nl_en("Opgeslagen in de bibliotheek", "Saved in the library"), f.name);
                 self.lib.own.push(f);
                 self.save_library();
                 self.lib.form = None;

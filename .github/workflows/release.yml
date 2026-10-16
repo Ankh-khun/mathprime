@@ -38,14 +38,12 @@ jobs:
         run: cargo test --workspace
 
       - name: Bouwen
-        run: cargo build --release -p rb-gui -p rb-cli
+        run: cargo build --release -p rb-gui -p rb-cli -p rb-setup
 
-      # IExpress hoort bij Windows, maar staat niet op elke runner: dan alleen de zip
-      - name: Installatiepakket (IExpress)
-        continue-on-error: true
+      # eigen installatieprogramma (crates/rb-setup) met de programmabestanden erachter
+      - name: Installatiepakket
         shell: pwsh
         run: |
-          if (-not (Test-Path "$env:SystemRoot\System32\iexpress.exe")) { throw "IExpress ontbreekt op deze runner" }
           powershell -NoProfile -ExecutionPolicy Bypass -File tools\maak-installer.ps1 -NietBouwen
 
       - name: Zip (zonder installatie)
