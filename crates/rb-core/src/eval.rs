@@ -1182,6 +1182,9 @@ impl Env {
         Ok(match e {
             Expr::Var(n) if !keep.contains(n) => match self.vars.get(n) {
                 Some(Value::Num(q)) if q.dim.is_none() => Expr::Num(q.value),
+                // met eenheid: getal maal eenheid (in de eenheid van de definitie), zoals Mathcad
+                // met "units in symbolics"; de eenheden zijn daarna gewone symbolen
+                Some(Value::Num(q)) => self.quantity_expr(*q, self.hints.get(n).map(String::as_str)).unwrap_or_else(|| e.clone()),
                 _ => e.clone(),
             },
             Expr::Neg(x) => Expr::Neg(Box::new(go(x)?)),
@@ -1218,6 +1221,46 @@ impl Env {
         })
     }
 
+    /// Een grootheid als `getal * eenheid` voor de pijl: in de eenheid van de definitie (`hint`), anders
+    /// automatisch (`kN`, `N/m`). `None` bij eenheden met een nulpunt (°C) of als het niet lukt.
+    fn quantity_expr(&self, q: Quantity, hint: Option<&str>) -> Option<Expr> {
+        // een hint is een eenheidsfamilie (`N`: het voorvoegsel kiest de weergave) of een keten (`kN/m`)
+        let text = match hint.map(|h| (h, rb_units::named_scale(h, q.value.abs(), q.dim))) {
+            Some((_, Some((_, named)))) => named,
+            Some((h, None)) if unit_text_value(h).is_some_and(|u| u.dim == q.dim) => h.to_string(),
+            _ => rb_units::auto_scale(q.value.abs(), q.dim).1,
+        };
+        if text.is_empty() || text.contains('°') {
+            return None;
+        }
+        let u = unit_text_value(&text).filter(|u| u.dim == q.dim && u.value != 0.0)?;
+        // het getal vooraan in de keten (`(20 * kN) * m`), zodat het als `20 kN · m` getoond wordt
+        fn lead(e: Expr, v: f64) -> Expr {
+            match e {
+                Expr::Bin(op @ (BinOp::Mul | BinOp::Div), a, b) => Expr::Bin(op, Box::new(lead(*a, v)), b),
+                // `1/s`: het getal komt in plaats van de 1
+                Expr::Num(one) if one == 1.0 => Expr::Num(v),
+                unit => Expr::Bin(BinOp::Mul, Box::new(Expr::Num(v)), Box::new(unit)),
+            }
+        }
+        Some(lead(crate::parser::parse_expr_str(&text).ok()?, q.value / u.value))
+    }
+
+    /// Staan er alleen nog getallen en eenheden in (`10 kN * 2 m`, `1 m + 50 cm`)? Dan is het één
+    /// grootheid: uitrekenen en netjes tonen (`20 kN·m`, `1.5 m`).
+    fn fold_units(&self, e: &Expr) -> Option<Expr> {
+        let names = e.names();
+        let is_unit = |n: &String| !self.vars.contains_key(n) && !self.funcs.contains_key(n) && lookup_unit(n).is_some();
+        if names.is_empty() || !names.iter().all(is_unit) {
+            return None;
+        }
+        match self.eval_expr(e).ok()? {
+            Value::Num(q) if q.dim.is_none() => Some(Expr::Num(q.value)),
+            Value::Num(q) => self.quantity_expr(q, None),
+            _ => None,
+        }
+    }
+
     fn eval_symbolic(&self, expr: &Expr, op: &SymOp) -> Result<Expr, Error> {
         use crate::symbolic as sym;
         let keep: Vec<String> = match op {
@@ -1241,7 +1284,13 @@ impl Env {
                 sym::simplify(&sym::substitute(&e, x, &v))
             }
         };
-        r.map_err(dom)
+        let r = r.map_err(dom)?;
+        if matches!(op, SymOp::Evaluate | SymOp::Simplify | SymOp::Substitute(..) | SymOp::Solve(_)) {
+            if let Some(q) = self.fold_units(&r) {
+                return Ok(q);
+            }
+        }
+        Ok(r)
     }
 
     /// Voer één geparseerde regel uit zonder de omgeving te wijzigen.

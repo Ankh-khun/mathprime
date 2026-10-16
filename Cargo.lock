@@ -2251,7 +2251,7 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "rb-cli"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "rb-core",
  "rb-export",
@@ -2262,14 +2262,14 @@ dependencies = [
 
 [[package]]
 name = "rb-core"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "rb-units",
 ]
 
 [[package]]
 name = "rb-edit"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "rb-core",
  "rb-layout",
@@ -2278,7 +2278,7 @@ dependencies = [
 
 [[package]]
 name = "rb-export"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "epaint_default_fonts",
  "miniz_oxide 0.9.1",
@@ -2291,7 +2291,7 @@ dependencies = [
 
 [[package]]
 name = "rb-gui"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "eframe",
  "egui_plot",
@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "rb-layout"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "rb-core",
  "rb-units",
@@ -2317,7 +2317,7 @@ dependencies = [
 
 [[package]]
 name = "rb-mcdx"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "miniz_oxide 0.9.1",
  "rb-core",
@@ -2328,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "rb-sheet"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "rb-core",
  "rb-units",
@@ -2337,11 +2337,11 @@ dependencies = [
 
 [[package]]
 name = "rb-units"
-version = "1.5.0"
+version = "1.6.0"
 
 [[package]]
 name = "rb-zipxml"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "miniz_oxide 0.9.1",
 ]

@@ -24,7 +24,14 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.5)
+## 2. Wat er nu staat (v1.6)
+
+**Nieuw in v1.6.** `odesolve` voor stelsels (`[x; y] := odesolve([x; y], t, b)`; `Stmt::ode_system`, de namen
+staan in de body van de bind, `Outcome::DefinedAll`, in de graaf via `also_defines`) en randwaardeproblemen
+(schietmethode, zie hieronder bij odesolve). De onafhankelijke variabele en de functies zijn in het Given-blok
+geen gebruik van een latere definitie. Eenheden bij de pijl (`Env::symbolic_inline`): een waarde met eenheid
+wordt `getal * eenheid` in de eenheid van de definitie (`named_scale` op de hint); blijven er alleen getallen en
+eenheden over, dan rekent `fold_units` het uit tot één grootheid (`20 kN · m`).
 
 **Nieuw in v1.5.** GitHub Actions: `ci.yml` (tests en een release-build met `-D warnings` op windows-latest, bij
 elke push naar main en elk pull request) en `release.yml` (bij een tag `v*`: versie tegen `Cargo.toml`, tests,

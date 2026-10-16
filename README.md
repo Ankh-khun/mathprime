@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.5 — melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.6 — odesolve voor stelsels en randwaardeproblemen, eenheden bij symbolisch rekenen; v1.5: melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -195,8 +195,10 @@ knoppen staan op het lint onder Operatoren → Symbolisch.
 | `deriv(x^3 + 2*x, x, x) →` | 3x² + 2 |
 | `integral(t, t, 0, x) → simplify` | x²/2 |
 
-Namen met een bekende waarde zonder eenheid worden ingevuld en eigen functies uitgeschreven, zoals in
-Mathcad. Eenheden doen niet mee (net als in Mathcad: `units-in-symbolics=false`). Het rekenwerk is
+Namen met een bekende waarde worden ingevuld en eigen functies uitgeschreven, zoals in Mathcad. Een
+waarde met eenheid komt erin als getal maal eenheid, en eenheden zijn daarna gewone symbolen
+(`F * x → 10 kN · x` met `F := 10 kN`). Blijven er alleen getallen en eenheden over, dan wordt dat één
+grootheid: `F * a → 20 kN · m`, `1 m + 50 cm → 1.5 m`, `k * u == 10 N → solve, u` geeft `5 mm`. Het rekenwerk is
 eigen code (`rb-core/src/symbolic.rs`): veeltermen met exacte breuken, wortels vereenvoudigen,
 differentiëren, integreren van veeltermen, de abc-formule. In .mcdx staat een pijlregel als
 `ml:symEval`; heen en terug via Mathcad Prime blijft het sleutelwoord met argument bewaard. De

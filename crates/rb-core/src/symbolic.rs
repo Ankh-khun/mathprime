@@ -826,4 +826,17 @@ mod taal {
         // een onbekend sleutelwoord geeft een duidelijke fout
         assert!(Env::new().run_line("x → vereenvoudigen").is_err());
     }
+
+    #[test]
+    fn eenheden_bij_de_pijl() {
+        // waarden met eenheid worden ingevuld als getal maal eenheid
+        assert_eq!(run("F := 10 kN\nF * x →"), "F * x → 10 * kN * x");
+        assert_eq!(run("q := 3 kN/m\nq * x^2 / 2 →"), "q * x^2 / 2 → 3 * kN * x^2 / (2 * m)");
+        // alleen getallen en eenheden over: één grootheid
+        assert_eq!(run("F := 10 kN\na := 2 m\nF * a →"), "F * a → 20 * kN * m");
+        assert_eq!(run("a := 1 m\nb := 50 cm\na + b →"), "a + b → 1.5 * m");
+        assert_eq!(run("a := 1 m\nb := 50 cm\na / b →"), "a / b → 2");
+        // de onbekende bij solve blijft staan
+        assert_eq!(run("k := 2 N/mm\nk * u == 10 N → solve, u"), "k * u == 10 N → 5 * mm");
+    }
 }
