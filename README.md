@@ -57,8 +57,8 @@ MathPrime eerst. Zonder vensters: `MathPrime-<versie>-setup.exe /Q` (de installa
 
 MathPrime kijkt eens per dag op GitHub of er een nieuwere versie is (alleen het versienummer, met
 `curl.exe` uit Windows); is die er, dan staat rechtsonder "Versie … is uit", met een klik naar de
-downloadpagina. Uit te zetten in Instellingen → Updates. Zolang de repository privé is, krijgt
-MathPrime geen antwoord en meldt het niets.
+downloadpagina (https://github.com/Ankh-khun/mathprime/releases). Uit te zetten in Instellingen →
+Updates. Zonder verbinding meldt MathPrime niets.
 
 ### Releases (GitHub Actions)
 
