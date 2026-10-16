@@ -1,0 +1,22 @@
+" annuïteit: 10000 lenen tegen 8 % per jaar, 10 maanden (Excel: -1037.03)
+pmt(0.08/12, 10, 10000) =                       // verwacht: -1037.03
+" netto contante waarde en intern rendement (voorbeelden van Excel)
+npv(0.1, [-10000; 3000; 4200; 6800]) =          // verwacht: 1188.44
+irr([-70000; 12000; 15000; 18000; 21000; 26000]) =   // verwacht: 0.0866309
+" effectieve rente bij 5.25 % per kwartaal bijgeschreven
+eff(0.0525, 4) =                                // verwacht: 0.0535427
+" verdubbelen bij 5 %: ln 2 / ln 1.05 perioden
+cnper(0.05, 100, 200) =                         // verwacht: 14.2067
+" Bessel van halftallige orde: J½(1) = √(2/π)·sin 1
+Jn(0.5, 1) =                                    // verwacht: 0.671397
+" bolfunctie j0(x) = sin x / x
+js(0, 2) =                                      // verwacht: 0.454649
+" Airy (Abramowitz & Stegun, tabel 10.11)
+Ai(1) =                                         // verwacht: 0.135292
+Bi(-2) =                                        // verwacht: -0.412303
+" randwaardeprobleem y'' = -y, y(0) = 0, y(π/2) = 1 zonder Given: y'(0) = 1
+D(x, y) := [y[1]; -y[0]]
+load(x1, v) := [0; v[0]]
+score(x2, y) := y[0] - 1
+s := sbval([0.5], 0, π/2, D, load, score)
+s[0] =                                          // verwacht: 1

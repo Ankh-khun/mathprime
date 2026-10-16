@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.7 — 3D-oppervlakken, hoogtelijnen, poolgrafieken en een tweede y-as; limieten, Taylorreeksen en meer integralen bij de pijl; Radau voor stijve vergelijkingen; regress, loess en gladmaken; direct afdrukken; sjablonen; slepen op het raster; Engelse interface; MIT-licentie; v1.6: odesolve voor stelsels en randwaardeproblemen, eenheden bij symbolisch rekenen; v1.5: melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.8 — een eigen installatieprogramma; zoeken naar updates en ze installeren vanuit MathPrime; Engelse formulebibliotheek; financiële functies, Airy en Bessel van gebroken orde, sbval, bvalfit en Stiffb; v1.7: 3D-oppervlakken, hoogtelijnen, poolgrafieken en een tweede y-as; limieten, Taylorreeksen en meer integralen bij de pijl; Radau voor stijve vergelijkingen; regress, loess en gladmaken; direct afdrukken; sjablonen; slepen op het raster; Engelse interface; MIT-licentie; v1.6: odesolve voor stelsels en randwaardeproblemen, eenheden bij symbolisch rekenen; v1.5: melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -42,8 +42,9 @@ de export (lettertypen, compressie) en de interface (egui) gebruiken crates van 
 powershell -ExecutionPolicy Bypass -File tools\maak-installer.ps1
 ```
 
-maakt `target\installer\MathPrime-<versie>-setup.exe` (met IExpress, dat in Windows zit). Dubbelklik
-erop om te installeren, zonder beheerdersrechten en alleen voor jezelf:
+maakt `target\installer\MathPrime-<versie>-setup.exe`: het eigen installatieprogramma (`crates/rb-setup`) met
+de programmabestanden erachter. Dubbelklik erop; een venster vraagt de installatiemap en of je een
+snelkoppeling op het bureaublad wilt, en installeert zonder beheerdersrechten en alleen voor jezelf:
 
 - de programma's in `%LOCALAPPDATA%\Programs\MathPrime`, met de voorbeelden in `voorbeelden`;
 - MathPrime in het Startmenu en op het bureaublad;
@@ -52,13 +53,15 @@ erop om te installeren, zonder beheerdersrechten en alleen voor jezelf:
 - verwijderen via Instellingen → Apps → MathPrime. Je werkbladen en instellingen (`%APPDATA%\MathPrime`)
   blijven dan staan.
 
-Een nieuwe versie installeer je door het nieuwe pakket te starten; het overschrijft de oude. Sluit
-MathPrime eerst. Zonder vensters: `MathPrime-<versie>-setup.exe /Q` (de installatie meldt dan niets).
+Een nieuwe versie installeer je door het nieuwe pakket te starten; het overschrijft de oude. Zonder venster:
+`MathPrime-<versie>-setup.exe /Q` (met `--doel <map>` voor een andere map).
 
 MathPrime kijkt eens per dag op GitHub of er een nieuwere versie is (alleen het versienummer, met
-`curl.exe` uit Windows); is die er, dan staat rechtsonder "Versie … is uit", met een klik naar de
-downloadpagina (https://github.com/Ankh-khun/mathprime/releases). Uit te zetten in Instellingen →
-Updates. Zonder verbinding meldt MathPrime niets.
+`curl.exe` uit Windows); is die er, dan staat rechtsonder "Versie … is uit". Zelf zoeken kan via Help →
+Zoeken naar updates of Instellingen → Updates, waar ook je versie staat. **Downloaden en installeren** haalt
+de nieuwe setup op, vraagt zoals altijd om open werk op te slaan, sluit MathPrime, installeert en start de
+nieuwe versie. Het dagelijkse kijken is uit te zetten in Instellingen → Updates; zonder verbinding meldt
+MathPrime niets.
 
 ### Releases (GitHub Actions)
 
@@ -112,7 +115,8 @@ De bron (gewone tekst) staat onder Beeld → Bron (Ctrl+Shift+B). Bewaren schrij
 plek op het blad (`@kolom,rij`). De menutoetsen staan in `keymap.txt` en de instellingen in
 `instellingen.txt` (Windows: `%APPDATA%\MathPrime`). Die stel je in via Bestand → Instellingen…
 (Ctrl+,): thema (licht, donker of zoals Windows), achtergrond, leeg blad of welkomstblad bij het
-starten, zoom, het aantal significante cijfers in uitkomsten en automatisch aanvullen.
+starten, zoom, het aantal significante cijfers in uitkomsten, automatisch aanvullen en vsync (standaard uit:
+dan volgt het venster de muis direct als je het verplaatst; aan geeft geen scheuren in beeld, na herstarten).
 
 MathPrime opent maar één venster: dubbelklik je in de Verkenner op een `.rkn` terwijl MathPrime al
 open is, dan komt het bestand als tabblad in dat venster. Elke minuut bewaart MathPrime een kopie
@@ -130,7 +134,8 @@ af: MathPrime maakt die PDF en geeft hem aan de PDF-lezer van Windows, die het p
 Bestand → **Nieuw uit sjabloon** geeft een verslag, een tentamen (vragen als inklapbare gebieden), een
 ligger op twee steunpunten of een warmtebalans, met kop- en voettekst. Regio's verslepen gaat op het
 raster; valt een regio over een andere, dan schuift hij omlaag tot er plek is, en wat je sleepte blijft
-geselecteerd. Instellingen → **Taal** zet de bediening in het Engels (meldingen blijven Nederlands).
+geselecteerd. Instellingen → **Taal** zet de bediening en de formulebibliotheek in het Engels (foutmeldingen bij het rekenen
+blijven Nederlands).
 
 Meerdere werkbladen staan in tabbladen onder het lint, zoals in Prime. Openen (of een bestand naar
 het venster slepen) opent een nieuw tabblad; is het huidige blad nog leeg, dan komt het daar. Een
@@ -324,7 +329,8 @@ u := odesolve(t, 2 s)           een functie: u(1 s) = mm
                                 [x; y] := odesolve([x; y], t, 10)
                                 randwaarden: w''''(x) == q/EI, w(0 m) == 0 m, w''(0 m) == 0,
                                 w(L) == 0 m, w''(L) == 0, w := odesolve(x, L)   (schietmethode)
-rkfixed([1; 0], 0, π, 100, D) = matrix met t en y; D(t, y) := [y[1]; -y[0]]  (ook Rkadapt, en Radau voor stijve vergelijkingen)
+rkfixed([1; 0], 0, π, 100, D) = matrix met t en y; D(t, y) := [y[1]; -y[0]]  (ook Rkadapt, Bulstoer, en Radau/Stiffb/Stiffr voor stijve vergelijkingen)
+sbval([0.5], 0, π/2, D, load, score) =   ontbrekende beginwaarden (randwaardeprobleem zonder Given); ook bvalfit
 
 λ := eigenvals(M^-1 * K)        ook eigenvecs, svd, svds, qr, lu, cholesky, rank, cond2
 slope(x.m, F.m) = N/mm          ook intercept, line, stderr, polyfit, linfit(vx, vy, F), genfit
@@ -333,6 +339,8 @@ ksmooth(vx, vy, b)  medsmooth(vy, 5)       gladmaken; localmax(vy), localmin(vy)
 interp(cspline(vx, vy), vx, vy, x) =    splines; linterp(vx, vy, x) lineair
 qnorm(0.975, 10 mm, 2 mm) =     verdelingen d/p/q: norm, lnorm, t, chisq, F, exp, unif, weibull
 fft(v) =                        ook ifft; elke lengte
+Jn(0.5, 2) =  Ai(1) =  js(1, x) =    Bessel ook van gebroken orde (Jn Yn In Kn), Airy Ai/Bi, bolfuncties js/ys
+pmt(0.05/12, 360, 200000) =     financieel: pv fv pmt nper rate npv irr mirr cnper crate eff nom cumint cumprinc fvadj fvc
 ```
 
 * Van boven naar beneden (en op een rij van links naar rechts): een naam moet vóór de plek van gebruik
@@ -381,6 +389,7 @@ Functies van één getal werken ook element voor element op een vector of matrix
 | `rb-mcdx` | Mathcad Prime-bestanden inlezen (eigen ZIP- en XML-lezer) |
 | `rb-edit` | de formule-editor: bewerkbare formule, gedrag van de toetsen van Prime, opmaak met cursor |
 | `rb-gui` | binary `mathprime` (egui): werkblad-canvas, lint, interactieve grafieken, bestanden |
+| `rb-setup` | binary `mathprime-setup` (egui): het installatieprogramma; de programmabestanden zitten er als ZIP achter |
 
 ## Wat MathPrime al beter doet dan het origineel
 

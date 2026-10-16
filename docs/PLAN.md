@@ -24,7 +24,37 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.7)
+## 2. Wat er nu staat (v1.8)
+
+**Nieuw in v1.8.** Uit de lijst in Notion ("Rekenblad"); de analyse van rb-gui (lint, venster, bibliotheek,
+update- en installatieroute) ging via Antigravity (agy, alleen lezen), het schrijven en testen hier.
+- **Installatieprogramma** (`crates/rb-setup`, binary `mathprime-setup`): egui-venster met welkom,
+  installatiemap (met Bladeren), snelkoppeling op het bureaublad, voortgang en "MathPrime starten". De
+  programmabestanden zitten als ZIP achter het exe-bestand (`[exe][zip][lengte u64][MPSETUP1]`, `payload.rs`;
+  `mathprime-setup --pak <map> <uit.exe>` maakt het pakket, met `rb-zipxml`). Installeren = uitpakken in een
+  tijdelijke map en `install.ps1 -Stil` zonder venster (snelkoppelingen, bestandstypen, PATH, Instellingen →
+  Apps: hetzelfde, geteste script). `/Q` zonder venster, `--doel`, `--wacht <pid>` (wachten tot MathPrime dicht
+  is), `--starten`, `--alleen-bestanden` (tests). IExpress is weg, ook uit `release.yml`.
+- **Updates** (`update.rs`): een `State` met `Phase` (zoeken, nieuwste, nieuwer, downloaden, installeren). Met de
+  hand via Help → Zoeken naar updates of Instellingen → Updates (daar ook versie, licentie en GitHub). De
+  release-JSON levert ook de downloadlink van `…-setup.exe`; "Downloaden en installeren" haalt die met curl.exe
+  naar de tijdelijke map, start hem met `--wacht <pid> --starten` en sluit MathPrime via de gewone
+  sluitroute (vraag om op te slaan).
+- **Bediening**: `interaction.selectable_labels = false` (egui maakte labels standaard selecteerbaar: de
+  I-cursor op de linttabbladen); de tabbladen tonen een handje. Vsync is een instelling (`vsync = aan|uit`,
+  standaard uit, gelezen vóór het venster er is): bij het verslepen van het venster wachtte elk frame op het
+  scherm, waardoor het venster achterbleef en nagleed. Een frame kost ~3 ms (gemeten op een blad van 486
+  regels met grafieken), dus daar lag het niet aan. `instellingen.txt` mag een BOM hebben.
+- **Engels**: `formulas-en.txt` (dezelfde 99 formules, vergelijkingen en namen; een test bewaakt dat), de
+  bibliotheek kiest op taal en laadt opnieuw bij een taalwissel; 45 ontbrekende vertalingen toegevoegd.
+- **Rekenen**: `finance.rs` (`pv fv pmt nper rate npv irr mirr cnper crate eff nom cumint cumprinc fvadj fvc`,
+  tekenafspraak en voorbeelden van Excel); Bessel `Jn Yn In Kn` ook van gebroken orde (integraalvormen van
+  Schläfli), `js`/`ys`, Airy `Ai`/`Bi` via orde 1/3; `sbval` en `bvalfit` (schietmethode met
+  Levenberg–Marquardt; residu geschaald met de grootte in en naast de startwaarde), `Stiffb`/`Stiffr`
+  (Radau), `Bulstoer` (Dormand–Prince).
+- **Snelheid**: gemeten in plaats van gegokt. Een blad van 486 regels (alle testbladen drie keer, met 2D- en
+  3D-grafieken) rekent in 0,25 s door; een frame in de interface kost ~3 ms. Geen knelpunt gevonden; niets
+  veranderd.
 
 **Nieuw in v1.7.** De analyse van grote bestanden (canvas.rs, symbolic.rs, de interfaceteksten) ging via
 Antigravity (agy, alleen lezen); het schrijven en testen gebeurde hier.
@@ -395,6 +425,12 @@ algebra) of een bestaande engine inbinden. `.mcdx`-import alleen na een juridisc
 ### Plan v1.8
 
 Uit de Notion-lijst "Rekenblad" (open punten op 16-10-2026) plus wat over was. Volgorde = bouwvolgorde.
+
+**Stand na v1.8**: 1–4, 6 en 8 klaar; 5 opgelost met vsync uit (niet automatisch na te bootsen, dus door de
+gebruiker te bevestigen); 7 wacht nog op een voorbeeld; 9 gemeten, geen knelpunt (zie §2). Afwijkingen van het
+plan: verwijderen blijft `uninstall.ps1` (staat al in Instellingen → Apps); de Jacobiaan van `Stiffb`/`Stiffr`
+wordt niet gebruikt (Radau bepaalt hem numeriek); bij bijwerken gaat open werk via de gewone vraag om op te
+slaan in plaats van via herstelbestanden.
 
 1. **Versienummer in de instellingen.** Een blok "Over MathPrime" in het instellingenvenster: versie
    (`CARGO_PKG_VERSION`), licentie (MIT), link naar GitHub.

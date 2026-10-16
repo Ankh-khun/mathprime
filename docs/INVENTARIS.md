@@ -38,11 +38,11 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Getaltheorie en combinatoriek | `gcd lcm factorial combin permut` | v0.2 |
 | Statistiek | `mean median var Var stdev Stdev corr cvar percentile hist` | v0.2, rest v0.3 |
 | Verdelingen | `d`/`p`/`q` + `norm lnorm t chisq F exp unif weibull`; `dbinom pbinom dpois ppois`; `rnd runif rnorm` | v0.3 |
-| Speciale functies | `erf erfc Γ (gamma) lnGamma Beta Ψ (digamma)`, Bessel `J0 J1 Jn Y0 Y1 Yn I0 I1 In K0 K1 Kn` | v0.3 |
+| Speciale functies | `erf erfc Γ (gamma) lnGamma Beta Ψ (digamma)`, Bessel `J0 J1 Jn Y0 Y1 Yn I0 I1 In K0 K1 Kn` (`Jn Yn In Kn` ook van gebroken orde), bolfuncties `js ys`, Airy `Ai Bi` | v0.3, v1.8 |
 | Interpolatie | `linterp`, `lspline`/`pspline`/`cspline` + `interp` | v0.3 |
 | Regressie | `slope intercept line stderr polyfit linfit genfit`; `regress` en `loess` (met `interp`), `ksmooth`, `medsmooth`, `localmax`, `localmin`, `filterNaN` | v0.3, v1.7 |
 | Oplossen | `root(f, x)`, `root(f, x, a, b)`, `polyroots`, `lsolve`, `Given` met `Find`/`Minerr`/`Minimize`/`Maximize` | v0.3 |
-| Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `odesolve` (willekeurige orde; stelsels `[x; y] := odesolve([x; y], t, b)`; begin- en randwaardeproblemen) | v0.3, v1.6 |
+| Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `Bulstoer`, `Radau`, `Stiffb`, `Stiffr`, `odesolve` (willekeurige orde; stelsels `[x; y] := odesolve([x; y], t, b)`; begin- en randwaardeproblemen), `sbval`, `bvalfit` | v0.3, v1.6, v1.7, v1.8 |
 | Signaalverwerking | `fft ifft cfft icfft` (elke lengte; numpy-normering, zie `PLAN.md` §3) | v0.3 |
 | Werkblad | definities, functies, resultaten, tekst, koppen, sweeps, posities `@kolom,rij`, afhankelijkheidsgraaf, meerregelige blokken, solve blocks | v0.1, posities v0.2, blokken v0.3 |
 | Grafieken | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface; logaritmische assen en vaste asgrenzen (`\| log xy, y = a ; b`); poolgrafieken (`\| polar`), tweede y-as (`links ; rechts`), 3D-oppervlakken en hoogtelijnen (`plot x = .., y = .. : f(x, y) [\| contour]`) | v0.4, v1.4, v1.7 |
@@ -50,17 +50,17 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Export | PDF (A4, ingebedde lettertypen) en SVG, ook via `mathprime-cli export` | v0.4 |
 | Tekst | strings als waarde; `concat strlen substr search num2str str2num str2vec vec2str IsString error` | v0.8 |
 | Bestanden | `READCSV READEXCEL READFILE WRITECSV WRITEEXCEL WRITEFILE` (.csv, .prn, .txt, .xlsx) | v0.9 |
+| Financieel | `pv fv pmt nper rate npv irr mirr cnper crate eff nom cumint cumprinc fvadj fvc` (tekenafspraak van Excel) | v1.8 |
 | Symbolisch | `→` met `simplify expand factor solve substitute limit series float`; `deriv`, integralen (veeltermen, standaardfuncties van a·x + b, partieel); eenheden doen mee (geen `assume`) | v0.9, v1.6, v1.7 |
 
 ## Nog te bouwen
 
 | categorie | voorbeelden | moeilijkheid | fase | bron |
 |---|---|---|---|---|
-| Differentiaalvergelijkingen (rest) | `sbval`, `bvalfit` (randwaarden zonder Given-blok), `Stiffb`, `Jacob` (Radau is er sinds v1.7) | M | 2+ | PTC-help (Jacob); overige eigen kennis |
-| Speciale functies (rest) | Airy `Ai`, `Bi`, Bessel van niet-gehele orde, elliptische integralen | M | 2+ | PTC-help |
+| Differentiaalvergelijkingen (rest) | `Jacob`; `stiffb`/`stiffr`/`rkadapt` (alleen het eindpunt) | S | 2+ | PTC-help (Jacob); overige eigen kennis |
+| Speciale functies (rest) | elliptische integralen | S | 2+ | PTC-help |
 | Data-analyse (rest) | PCA (`Nipals`), `supsmooth` | L | 2+ | PTC-help |
 | Design of Experiments | ontwerpmatrices, factor screening, ANOVA, regressie, Monte Carlo | L | 2+ | PTC-help |
-| Financieel | contante waarde, toekomstige waarde, rente, betaling, intern rendement | S–M | 2+ | PTC-help |
 | Grafieken (rest) | `CreateSpace`/`CreateMesh`, 3D-krommen en vectorvelden | L | 3+ | PTC-help (Graphing) |
 | Beeldverwerking | kleur, binarisatie, convolutie, morfologie, transformaties | L | 5+ | PTC-help; waarschijnlijk laag prioriteit |
 
@@ -82,3 +82,4 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Automatisch aanvullen | M | — | **v1.0** (namen van het blad, functies en eenheden; Tab, ↑↓, Ctrl+Spatie; `rb-edit/src/complete.rs`) |
 | Tabellen (Ctrl+6) | M | — | **v1.0** (`tabel x [mm], F [kN] { ... }`: kolommen met eenheid; celbewerker met Tab en Enter; naar .mcdx als een definitie per kolom) |
 | Inklapbare gebieden, pagina-einden, kop- en voetteksten | M | — | **v1.0** (`area` … `area end`, `pagebreak`, `header`/`footer` met {pagina} {paginas} {bestand} {datum}; Ctrl+Shift+A, Ctrl+Enter; pagina-einde ook in .mcdx) |
+| Installatieprogramma en updates | M | — | **v1.8** (eigen setup `rb-setup` met venster; zoeken naar updates en downloaden en installeren vanuit MathPrime) |
