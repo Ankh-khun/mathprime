@@ -392,6 +392,43 @@ installatie (zie §6).
 algebra) of een bestaande engine inbinden. `.mcdx`-import alleen na een juridische check en met een duidelijk
 "best effort"-label.
 
+### Plan v1.8
+
+Uit de Notion-lijst "Rekenblad" (open punten op 16-10-2026) plus wat over was. Volgorde = bouwvolgorde.
+
+1. **Versienummer in de instellingen.** Een blok "Over MathPrime" in het instellingenvenster: versie
+   (`CARGO_PKG_VERSION`), licentie (MIT), link naar GitHub.
+2. **Knop "Zoek naar updates".** Naast het versienummer en in het menu Help. Handmatig zoeken gebruikt
+   dezelfde `update.rs` (curl.exe naar de GitHub-API), maar zonder de dagstempel en met een melding als je
+   al de nieuwste hebt. Is er een nieuwere: "Downloaden en installeren" haalt `MathPrime-<versie>-setup.exe`
+   via curl.exe naar de tijdelijke map, bewaart open tabbladen (herstelbestanden), start de setup en sluit
+   MathPrime. De setup wacht tot MathPrime dicht is.
+3. **Een mooie installer.** Eigen setup in Rust/egui (nieuwe crate `rb-setup`, geen externe crates): welkom,
+   installatiemap, voortgang, "MathPrime starten". De programmabestanden zitten erin als zip (eigen
+   zipcode uit `rb-zipxml`). Schrijft snelkoppelingen, de `.rkn`-koppeling en een vermelding in
+   Windows → Apps (`HKCU\...\Uninstall\MathPrime`) met versie, icoon en verwijderen. `/Q` installeert
+   stil (voor punt 2). `uninstall` via dezelfde exe (`--verwijderen`). IExpress vervalt.
+4. **Cursor op de linttabbladen.** Linten en labels zijn niet selecteerbaar: een pijl of handje in plaats
+   van de tekstcursor.
+5. **Venster "glijdt door" na verplaatsen.** Eerst de oorzaak vinden (herteken-lus, vensterpositie
+   bewaren, animaties), dan oplossen.
+6. **Formulebibliotheek in het Engels.** `formulas-en.txt` met dezelfde 99 formules (zelfde
+   vergelijkingen en namen, Engelse titels, omschrijvingen en categorieën); de bibliotheek kiest het
+   bestand op taal. Eigen formules blijven ongewijzigd.
+7. **Gebieden en kop/voettekst in .mcdx.** Wacht op een voorbeeldblad uit Mathcad Prime (geen van de
+   bestaande bladen heeft een gebied of kop/voettekst).
+8. **Rekenfuncties.**
+   - financieel: `pv fv pmt nper rate npv irr mirr cnper crate eff nom cumint cumprinc fvadj fvc`;
+   - speciaal: Airy `Ai Bi`, bolfuncties van Bessel `js ys`, Bessel `Jn Yn In Kn` ook voor niet-gehele orde;
+   - differentiaalvergelijkingen: `sbval`, `bvalfit` (schietmethode), `Stiffb`/`Stiffr` (Radau, met de
+     opgegeven Jacobiaan).
+9. **Snelheid bij grote bladen.** Meten op een groot testblad (300+ regio's, grafieken), dan de
+   grootste kostenposten aanpakken (bijv. grafieken alleen opnieuw rekenen als hun invoer verandert,
+   lay-out van ongewijzigde regio's bewaren).
+
+Daarna, voor v1.9 en later: punt 7 zodra er een voorbeeld is; 3D-krommen en vectorvelden; opzoektabellen
+(profielen, boutmaten) als `.rkn`-bibliotheken; tolerantie- en foutenpropagatie; `--watch`.
+
 ## 5. Verbeteringen op Mathcad
 
 Al gebouwd:

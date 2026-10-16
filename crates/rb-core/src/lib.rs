@@ -19,6 +19,7 @@ pub mod strings;
 pub mod symbolic;
 mod error;
 mod eval;
+pub mod finance;
 pub mod fit;
 mod lexer;
 pub mod linalg;

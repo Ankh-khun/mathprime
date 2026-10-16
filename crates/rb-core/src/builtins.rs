@@ -284,7 +284,7 @@ fn call_special(name: &str, a: &[Quantity]) -> Option<Result<Quantity, Error>> {
     };
     Some(match name {
         "erf" | "erfc" | "Γ" | "gamma" | "lnGamma" | "Ψ" | "digamma" | "J0" | "J1" | "Y0" | "Y1"
-        | "I0" | "I1" | "K0" | "K1" => arity(name, a, 1).and_then(|_| {
+        | "I0" | "I1" | "K0" | "K1" | "Ai" | "Bi" => arity(name, a, 1).and_then(|_| {
             let v = x(0)?;
             match name {
                 "erf" => s(sp::erf(v)),
@@ -299,17 +299,27 @@ fn call_special(name: &str, a: &[Quantity]) -> Option<Result<Quantity, Error>> {
                 "I0" => s(sp::bessel_i(0, v)),
                 "I1" => s(sp::bessel_i(1, v)),
                 "K0" => s(sp::bessel_k(0, v)?),
+                "Ai" => s(sp::airy_ai(v)?),
+                "Bi" => s(sp::airy_bi(v)?),
                 _ => s(sp::bessel_k(1, v)?),
             }
         }),
+        // orde mag niet-geheel zijn (Mathcad: alleen geheel)
         "Jn" | "Yn" | "In" | "Kn" => arity(name, a, 2).and_then(|_| {
-            let (n, v) = (order(0)?, x(1)?);
-            match name {
-                "Jn" => s(sp::bessel_j(n, v)),
-                "Yn" => s(sp::bessel_y(n, v)?),
-                "In" => s(sp::bessel_i(n, v)),
-                _ => s(sp::bessel_k(n, v)?),
+            let (n, v) = (x(0)?, x(1)?);
+            if n.abs() > 1000.0 {
+                return Err(domain(name, "de orde moet tussen −1000 en 1000 liggen"));
             }
+            match name {
+                "Jn" => s(sp::bessel_jv(n, v)?),
+                "Yn" => s(sp::bessel_yv(n, v)?),
+                "In" => s(sp::bessel_iv(n, v)?),
+                _ => s(sp::bessel_kv(n, v)?),
+            }
+        }),
+        "js" | "ys" => arity(name, a, 2).and_then(|_| {
+            let (n, v) = (order(0)?, x(1)?);
+            if name == "js" { s(sp::sph_j(n, v)?) } else { s(sp::sph_y(n, v)?) }
         }),
         "Beta" => arity(name, a, 2).and_then(|_| s(sp::beta(positive(name, "a", x(0)?)?, positive(name, "b", x(1)?)?))),
         // normale verdeling: dnorm(x, μ, σ), pnorm(x, μ, σ), qnorm(p, μ, σ)
@@ -426,7 +436,7 @@ const ELEMENTWISE: &[&str] = &[
     "sqrt", "cbrt", "abs", "sin", "cos", "tan", "cot", "sec", "csc", "asin", "acos", "atan", "acot",
     "sinh", "cosh", "tanh", "coth", "asinh", "acosh", "atanh", "acoth", "exp", "ln", "log", "log2",
     "floor", "ceil", "trunc", "round", "sign", "Φ", "Heaviside", "factorial", "fact",
-    "erf", "erfc", "Γ", "gamma", "lnGamma", "Ψ", "digamma", "J0", "J1", "Y0", "Y1", "I0", "I1", "K0", "K1",
+    "erf", "erfc", "Γ", "gamma", "lnGamma", "Ψ", "digamma", "J0", "J1", "Y0", "Y1", "I0", "I1", "K0", "K1", "Ai", "Bi",
 ];
 
 fn mat<'a>(name: &str, v: &'a Value) -> Result<&'a Matrix, Error> {
@@ -914,6 +924,9 @@ pub fn call(name: &str, a: &[Value], origin: i64) -> Option<Result<Value, Error>
     if let Some(r) = crate::fit::call(name, a, origin) {
         return Some(r);
     }
+    if let Some(r) = crate::finance::call(name, a) {
+        return Some(r);
+    }
     if a.len() == 1 && ELEMENTWISE.contains(&name) {
         if let Value::Matrix(m) = &a[0] {
             return Some(
@@ -954,7 +967,7 @@ pub const NAMES: &[&str] = &[
     "Re", "Im", "arg", "conj",
     // speciale functies
     "erf", "erfc", "Γ", "gamma", "lnGamma", "Beta", "Ψ", "digamma",
-    "J0", "J1", "Jn", "Y0", "Y1", "Yn", "I0", "I1", "In", "K0", "K1", "Kn",
+    "J0", "J1", "Jn", "Y0", "Y1", "Yn", "I0", "I1", "In", "K0", "K1", "Kn", "js", "ys", "Ai", "Bi",
     // statistiek
     "sum", "prod", "mean", "median", "var", "Var", "stdev", "Stdev", "corr", "cvar", "percentile",
     "hist",
@@ -971,8 +984,11 @@ pub const NAMES: &[&str] = &[
     // interpolatie en regressie
     "linterp", "lspline", "pspline", "cspline", "interp", "slope", "intercept", "line", "stderr",
     "polyfit", "linfit", "genfit", "regress", "loess", "ksmooth", "medsmooth", "localmax", "localmin", "filterNaN",
+    // financieel (zie finance.rs)
+    "pv", "fv", "pmt", "nper", "rate", "npv", "irr", "mirr", "cnper", "crate", "eff", "nom", "cumint",
+    "cumprinc", "fvadj", "fvc",
     // differentiaalvergelijkingen en oplossers
-    "rkfixed", "Rkadapt", "Radau", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
+    "rkfixed", "Rkadapt", "Bulstoer", "Radau", "Stiffb", "Stiffr", "sbval", "bvalfit", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
     // tekst
     "concat", "strlen", "substr", "search", "str2num", "num2str", "str2vec", "vec2str", "IsString", "error",
     // bestanden (via het werkblad, zie rb-sheet/src/io.rs)

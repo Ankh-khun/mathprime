@@ -289,6 +289,35 @@ fn odesolve_randwaardeprobleem() {
 }
 
 #[test]
+fn sbval_bvalfit_en_stiffb() {
+    // y'' = -y met y(0) = 0 en y(π/2) = 1: y = sin x, dus y'(0) = 1
+    let base = "D(x, y) := [y[1]; -y[0]]\nload(x1, v) := [0; v[0]]\nscore(x2, y) := y[0] - 1\n";
+    let sheet = Sheet::load(&format!("{base}s := sbval([0.5], 0, π/2, D, load, score)\ns[0] =\n"));
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "s[0]"), "1");
+    // van beide kanten naar π/4: in π/2 is y = 1 en y' onbekend (0)
+    let src = format!(
+        "{base}load2(x2, v) := [1; v[0]]\nsc(xf, y) := y\nb := bvalfit([0.5], [0.5], 0, π/2, π/4, D, load, load2, sc)\nb[0] =\n"
+    );
+    let sheet = Sheet::load(&src);
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "b[0]"), "1");
+    // Stiffb: y' = -1000 (y - cos x), stijf
+    let sheet = Sheet::load("D(x, y) := [-1000 * (y[0] - cos(x))]\nJ(x, y) := [0, -1000]\nS := Stiffb([1], 0, 1, 10, D, J)\nS[10, 1] =\n");
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "S[10, 1]"), "0.541143");
+}
+
+#[test]
+fn financieel_en_speciaal_in_een_blad() {
+    let sheet = Sheet::load("pmt(0.08/12, 10, 10000) =\nAi(1) =\nJn(0.5, 1) =\n");
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "pmt(0.08/12, 10, 10000)"), "-1037.03");
+    assert_eq!(value_of(&sheet, "Ai(1)"), "0.135292");
+    assert_eq!(value_of(&sheet, "Jn(0.5, 1)"), "0.671397");
+}
+
+#[test]
 fn diepe_recursie_in_een_blad() {
     let sheet = Sheet::load("som(n) := if(n == 0, 0, n + som(n - 1))\nsom(150) =\n");
     assert_eq!(sheet.output(1), &Output::Value("11325".into()));

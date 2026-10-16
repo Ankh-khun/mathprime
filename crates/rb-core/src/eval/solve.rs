@@ -91,7 +91,9 @@ impl Env {
         Some(match name {
             "linfit" => self.linfit(args, loc, depth),
             "genfit" => self.genfit(args, loc, depth),
-            "rkfixed" | "Rkadapt" | "Radau" => self.ode_fixed(name, args, loc, depth),
+            "rkfixed" | "Rkadapt" | "Bulstoer" | "Radau" | "Stiffb" | "Stiffr" => self.ode_fixed(name, args, loc, depth),
+            "sbval" => self.sbval(args, loc, depth),
+            "bvalfit" => self.bvalfit(args, loc, depth),
             "Find" | "Minerr" => self.find(name, args, loc, depth),
             "Minimize" | "Maximize" => self.minimize(name, args, loc, depth),
             _ => return None,
@@ -179,21 +181,10 @@ impl Env {
     // -----------------------------------------------------------------------------------------
     // Differentiaalvergelijkingen
 
-    /// `rkfixed(y, x1, x2, n, D)` en `Rkadapt(...)`: matrix met x in kolom 0 en y in de volgende kolommen.
-    fn ode_fixed(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
-        Self::want(name, args, 5)?;
-        let init = self.eval(&args[0], loc, depth)?;
-        // een beginwaarde als vector ([1]) geeft D ook een vector, zoals in Mathcad (y[0] werkt dan)
-        let as_vector = matches!(init, Value::Matrix(_));
-        let y0 = components(&init, "de beginwaarde y")?;
-        let x1 = real(self.eval(&args[1], loc, depth)?, "x1")?;
-        let x2 = real(self.eval(&args[2], loc, depth)?, "x2")?;
-        x1.same_dim(x2, "de grenzen van de differentiaalvergelijking")?;
-        let n = real(self.eval(&args[3], loc, depth)?, "het aantal punten")?.dimensionless_value("het aantal punten")?;
-        if n.fract() != 0.0 || !(1.0..=100_000.0).contains(&n) {
-            return Err(dom(format!("{name}: het aantal punten moet een geheel getal van 1 tot en met 100000 zijn")));
-        }
-        let d = self.fn_arg(&args[4], name)?;
+    /// Los y' = D(x, y) op van x1 tot x2 in n stappen; geeft de toestand in elk punt (SI-getallen).
+    /// `method`: "rkfixed" (RK4), "Radau" (impliciet, stijf) of anders Dormand–Prince.
+    #[allow(clippy::too_many_arguments)]
+    fn ode_path(&self, name: &str, d: &str, x1: Quantity, x2: f64, y0: &[Quantity], as_vector: bool, n: usize, method: &str, depth: usize) -> Result<Vec<Vec<f64>>, Error> {
         let ydims: Vec<Dim> = y0.iter().map(|q| q.dim).collect();
         let want: Vec<Dim> = ydims
             .iter()
@@ -217,20 +208,148 @@ impl Env {
             Ok(out.iter().map(|q| q.value).collect())
         };
         let start: Vec<f64> = y0.iter().map(|q| q.value).collect();
+        match method {
+            "rkfixed" => numeric::rk4(&mut rhs, &start, x1.value, x2, n),
+            "Radau" => numeric::radau(&mut rhs, &start, x1.value, x2, n, 1e-8),
+            _ => numeric::dopri(&mut rhs, &start, x1.value, x2, n, 1e-10),
+        }
+    }
+
+    /// `rkfixed(y, x1, x2, n, D)`, `Rkadapt`, `Bulstoer`, `Radau`, en `Stiffb`/`Stiffr(y, x1, x2, n, D, J)`:
+    /// matrix met x in kolom 0 en y in de volgende kolommen. De Jacobiaan J van Stiffb/Stiffr moet een
+    /// functie zijn maar wordt niet gebruikt: Radau bepaalt hem zelf numeriek.
+    fn ode_fixed(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        let stiff = matches!(name, "Stiffb" | "Stiffr");
+        Self::want(name, args, if stiff { 6 } else { 5 })?;
+        let init = self.eval(&args[0], loc, depth)?;
+        // een beginwaarde als vector ([1]) geeft D ook een vector, zoals in Mathcad (y[0] werkt dan)
+        let as_vector = matches!(init, Value::Matrix(_));
+        let y0 = components(&init, "de beginwaarde y")?;
+        let x1 = real(self.eval(&args[1], loc, depth)?, "x1")?;
+        let x2 = real(self.eval(&args[2], loc, depth)?, "x2")?;
+        x1.same_dim(x2, "de grenzen van de differentiaalvergelijking")?;
+        let n = real(self.eval(&args[3], loc, depth)?, "het aantal punten")?.dimensionless_value("het aantal punten")?;
+        if n.fract() != 0.0 || !(1.0..=100_000.0).contains(&n) {
+            return Err(dom(format!("{name}: het aantal punten moet een geheel getal van 1 tot en met 100000 zijn")));
+        }
         let n = n as usize;
-        let sol = match name {
-            "rkfixed" => numeric::rk4(&mut rhs, &start, x1.value, x2.value, n)?,
-            // stijve vergelijkingen: impliciet
-            "Radau" => numeric::radau(&mut rhs, &start, x1.value, x2.value, n, 1e-8)?,
-            _ => numeric::dopri(&mut rhs, &start, x1.value, x2.value, n, 1e-10)?,
+        let d = self.fn_arg(&args[4], name)?;
+        if stiff {
+            self.fn_arg(&args[5], name)?;
+        }
+        let method = match name {
+            "rkfixed" => "rkfixed",
+            "Radau" | "Stiffb" | "Stiffr" => "Radau",
+            _ => "dopri",
         };
-        let cols = 1 + start.len();
+        let sol = self.ode_path(name, d, x1, x2.value, &y0, as_vector, n, method, depth)?;
+        let cols = 1 + y0.len();
         let mut data = Vec::with_capacity((n + 1) * cols);
         for (k, row) in sol.iter().enumerate() {
             data.push(Quantity::new(x1.value + (x2.value - x1.value) * k as f64 / n as f64, x1.dim));
-            data.extend(row.iter().zip(&ydims).map(|(v, d)| Quantity::new(*v, *d)));
+            data.extend(row.iter().zip(&y0).map(|(v, q)| Quantity::new(*v, q.dim)));
         }
         Ok(Value::Matrix(Matrix::new(n + 1, cols, data)))
+    }
+
+    /// Getallen als waarde, in dezelfde vorm en eenheden als `like` (los getal of vector).
+    fn shaped(vals: &[f64], like: &[Quantity], as_vector: bool) -> Value {
+        let qs: Vec<Quantity> = vals.iter().zip(like).map(|(v, q)| Quantity::new(*v, q.dim)).collect();
+        if as_vector {
+            Value::Matrix(Matrix::column(qs))
+        } else {
+            vector_value(qs)
+        }
+    }
+
+    /// Start in x1 met load(x1, v) en integreer naar x2; geeft de eindtoestand als waarde.
+    #[allow(clippy::too_many_arguments)]
+    fn shoot(&self, name: &str, d: &str, load: &str, x1: Quantity, x2: f64, v: Value, depth: usize) -> Result<Value, Error> {
+        let start = self.call_user(load, vec![Value::Num(x1), v], depth)?;
+        let as_vector = matches!(start, Value::Matrix(_));
+        let y0 = components(&start, &format!("{name}: de uitkomst van load"))?;
+        let path = self.ode_path(name, d, x1, x2, &y0, as_vector, 1, "dopri", depth)?;
+        Ok(Self::shaped(&path[1], &y0, as_vector))
+    }
+
+    /// Los residu(onbekenden) = 0 op met Levenberg–Marquardt, geschaald met de startwaarden. Elk residu
+    /// wordt geschaald met zijn grootte in de startwaarde en in een iets verschoven startwaarde (in de
+    /// startwaarde alleen kan het toevallig bijna 0 zijn).
+    fn shooting_solve(name: &str, guess: &[Quantity], resid: &mut dyn FnMut(&[f64]) -> Result<Vec<Quantity>, Error>) -> Result<Vec<f64>, Error> {
+        let scales: Vec<f64> = guess.iter().map(|q| scale_of(q.value)).collect();
+        let r0 = resid(&guess.iter().map(|q| q.value).collect::<Vec<_>>())?;
+        let r1 = resid(&guess.iter().zip(&scales).map(|(q, s)| q.value + 0.1 * s).collect::<Vec<_>>())?;
+        let rs: Vec<f64> = r0.iter().zip(&r1).map(|(a, b)| scale_of(a.value.abs().max(b.value.abs()))).collect();
+        let mut f = |p: &[f64]| -> Result<Vec<f64>, Error> {
+            let x: Vec<f64> = p.iter().zip(&scales).map(|(a, s)| a * s).collect();
+            Ok(resid(&x)?.iter().zip(&rs).map(|(q, s)| q.value / s).collect())
+        };
+        let p0: Vec<f64> = guess.iter().zip(&scales).map(|(q, s)| q.value / s).collect();
+        let (p, cost) = numeric::levenberg_marquardt(&mut f, p0)?;
+        if cost > 1e-16 {
+            return Err(dom(format!(
+                "{name}: geen oplossing gevonden (restfout {:.3e}); probeer andere startwaarden",
+                cost.sqrt()
+            )));
+        }
+        Ok(p.iter().zip(&scales).map(|(a, s)| a * s).collect())
+    }
+
+    /// `sbval(v, x1, x2, D, load, score)`: de ontbrekende beginwaarden v in x1, zodat score(x2, y(x2)) = 0.
+    fn sbval(&self, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        let name = "sbval";
+        Self::want(name, args, 6)?;
+        let guess_v = self.eval(&args[0], loc, depth)?;
+        let as_vector = matches!(guess_v, Value::Matrix(_));
+        let guess = components(&guess_v, "de startwaarden v")?;
+        let x1 = real(self.eval(&args[1], loc, depth)?, "x1")?;
+        let x2 = real(self.eval(&args[2], loc, depth)?, "x2")?;
+        x1.same_dim(x2, "de grenzen van sbval")?;
+        let (d, load, score) = (self.fn_arg(&args[3], name)?, self.fn_arg(&args[4], name)?, self.fn_arg(&args[5], name)?);
+        let mut resid = |x: &[f64]| -> Result<Vec<Quantity>, Error> {
+            let end = self.shoot(name, d, load, x1, x2.value, Self::shaped(x, &guess, as_vector), depth)?;
+            let r = components(&self.call_user(score, vec![Value::Num(x2), end], depth)?, "sbval: de uitkomst van score")?;
+            if r.len() != guess.len() {
+                return Err(dom(format!("sbval: score moet evenveel elementen geven als v ({})", guess.len())));
+            }
+            Ok(r)
+        };
+        let sol = Self::shooting_solve(name, &guess, &mut resid)?;
+        Ok(Self::shaped(&sol, &guess, as_vector))
+    }
+
+    /// `bvalfit(v1, v2, x1, x2, xf, D, load1, load2, score)`: schiet vanuit x1 en vanuit x2 naar xf en zoek
+    /// v1 en v2 zodat score(xf, y) van beide kanten gelijk is. Geeft de startwaarden v1 in x1.
+    fn bvalfit(&self, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        let name = "bvalfit";
+        Self::want(name, args, 9)?;
+        let (g1v, g2v) = (self.eval(&args[0], loc, depth)?, self.eval(&args[1], loc, depth)?);
+        let (vec1, vec2) = (matches!(g1v, Value::Matrix(_)), matches!(g2v, Value::Matrix(_)));
+        let (g1, g2) = (components(&g1v, "de startwaarden v1")?, components(&g2v, "de startwaarden v2")?);
+        let x1 = real(self.eval(&args[2], loc, depth)?, "x1")?;
+        let x2 = real(self.eval(&args[3], loc, depth)?, "x2")?;
+        let xf = real(self.eval(&args[4], loc, depth)?, "xf")?;
+        x1.same_dim(x2, "de grenzen van bvalfit")?;
+        x1.same_dim(xf, "het aansluitpunt xf")?;
+        let d = self.fn_arg(&args[5], name)?;
+        let (load1, load2, score) = (self.fn_arg(&args[6], name)?, self.fn_arg(&args[7], name)?, self.fn_arg(&args[8], name)?);
+        let guess: Vec<Quantity> = g1.iter().chain(&g2).copied().collect();
+        let k = g1.len();
+        let mut resid = |x: &[f64]| -> Result<Vec<Quantity>, Error> {
+            let a = self.shoot(name, d, load1, x1, xf.value, Self::shaped(&x[..k], &g1, vec1), depth)?;
+            let b = self.shoot(name, d, load2, x2, xf.value, Self::shaped(&x[k..], &g2, vec2), depth)?;
+            let sa = components(&self.call_user(score, vec![Value::Num(xf), a], depth)?, "bvalfit: de uitkomst van score")?;
+            let sb = components(&self.call_user(score, vec![Value::Num(xf), b], depth)?, "bvalfit: de uitkomst van score")?;
+            if sa.len() != guess.len() || sb.len() != guess.len() {
+                return Err(dom(format!(
+                    "bvalfit: score moet evenveel elementen geven als v1 en v2 samen ({})",
+                    guess.len()
+                )));
+            }
+            Ok(sa.iter().zip(&sb).map(|(p, q)| Quantity::new(p.value - q.value, p.dim)).collect())
+        };
+        let sol = Self::shooting_solve(name, &guess, &mut resid)?;
+        Ok(Self::shaped(&sol[..k], &g1, vec1))
     }
 
     /// `y := odesolve(t, b)` en `[x; y] := odesolve([x; y], t, b)`: los de differentiaalvergelijking(en) in

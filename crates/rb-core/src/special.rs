@@ -274,6 +274,150 @@ pub fn bessel_k(n: i32, x: f64) -> Result<f64, Error> {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Bessel van willekeurige (reële) orde, bolfuncties van Bessel en Airy
+
+fn is_int(v: f64) -> bool {
+    v.fract() == 0.0 && v.abs() <= 1000.0
+}
+
+/// J_ν(x) voor reële ν. Gehele orde via [`bessel_j`]; anders x ≥ 0 en de integraal van Schläfli:
+/// J_ν(x) = (1/π)∫₀^π cos(ντ − x sin τ) dτ − (sin νπ/π)∫₀^∞ e^{−x sinh t − νt} dt.
+pub fn bessel_jv(nu: f64, x: f64) -> Result<f64, Error> {
+    if is_int(nu) {
+        return Ok(bessel_j(nu as i32, x));
+    }
+    if x < 0.0 {
+        return Err(dom("J_ν(x) met niet-gehele orde bestaat alleen voor x ≥ 0"));
+    }
+    if x == 0.0 {
+        return if nu > 0.0 { Ok(0.0) } else { Err(dom("J_ν(0) is oneindig voor ν < 0")) };
+    }
+    let a = numeric::integrate(&mut |t| Ok((nu * t - x * t.sin()).cos()), 0.0, PI)?;
+    let b = numeric::integrate(
+        &mut |t| {
+            let e = -x * t.sinh() - nu * t;
+            Ok(if e < -745.0 { 0.0 } else { e.exp() })
+        },
+        0.0,
+        f64::INFINITY,
+    )?;
+    Ok((a - (nu * PI).sin() * b) / PI)
+}
+
+/// Y_ν(x), x > 0: (1/π)∫₀^π sin(x sin τ − ντ) dτ − (1/π)∫₀^∞ (e^{νt} + cos(νπ) e^{−νt}) e^{−x sinh t} dt.
+pub fn bessel_yv(nu: f64, x: f64) -> Result<f64, Error> {
+    if is_int(nu) {
+        return bessel_y(nu as i32, x);
+    }
+    if x <= 0.0 {
+        return Err(dom("Y_ν(x) bestaat alleen voor x > 0"));
+    }
+    let a = numeric::integrate(&mut |t| Ok((x * t.sin() - nu * t).sin()), 0.0, PI)?;
+    let c = (nu * PI).cos();
+    let b = numeric::integrate(
+        &mut |t| {
+            let e = -x * t.sinh();
+            Ok(if e < -745.0 { 0.0 } else { (nu * t + e).exp() + c * (-nu * t + e).exp() })
+        },
+        0.0,
+        f64::INFINITY,
+    )?;
+    Ok((a - b) / PI)
+}
+
+/// I_ν(x), x ≥ 0: (1/π)∫₀^π e^{x cos τ} cos(ντ) dτ − (sin νπ/π)∫₀^∞ e^{−x cosh t − νt} dt.
+pub fn bessel_iv(nu: f64, x: f64) -> Result<f64, Error> {
+    if is_int(nu) {
+        return Ok(bessel_i(nu as i32, x));
+    }
+    if x < 0.0 {
+        return Err(dom("I_ν(x) met niet-gehele orde bestaat alleen voor x ≥ 0"));
+    }
+    if x == 0.0 {
+        return if nu > 0.0 { Ok(0.0) } else { Err(dom("I_ν(0) is oneindig voor ν < 0")) };
+    }
+    let a = numeric::integrate(&mut |t| Ok((x * t.cos()).exp() * (nu * t).cos()), 0.0, PI)?;
+    let b = numeric::integrate(
+        &mut |t| {
+            let e = -x * t.cosh() - nu * t;
+            Ok(if e < -745.0 { 0.0 } else { e.exp() })
+        },
+        0.0,
+        f64::INFINITY,
+    )?;
+    Ok((a - (nu * PI).sin() * b) / PI)
+}
+
+/// K_ν(x) = ∫₀^∞ e^{−x cosh t} cosh(νt) dt, x > 0 (elke reële orde).
+pub fn bessel_kv(nu: f64, x: f64) -> Result<f64, Error> {
+    if x <= 0.0 {
+        return Err(dom("K_ν(x) bestaat alleen voor x > 0"));
+    }
+    numeric::integrate(
+        &mut |t| {
+            let e = -x * t.cosh();
+            Ok(if e < -745.0 { 0.0 } else { 0.5 * ((nu * t + e).exp() + (-nu * t + e).exp()) })
+        },
+        0.0,
+        f64::INFINITY,
+    )
+}
+
+/// Bolfunctie van Bessel j_n(x) = √(π/2x) J_{n+½}(x).
+pub fn sph_j(n: i32, x: f64) -> Result<f64, Error> {
+    if x == 0.0 {
+        return match n {
+            0 => Ok(1.0),
+            n if n > 0 => Ok(0.0),
+            _ => Err(dom("js(n, 0) is oneindig voor n < 0")),
+        };
+    }
+    let r = (PI / (2.0 * x.abs())).sqrt() * bessel_jv(n as f64 + 0.5, x.abs())?;
+    // j_n is even voor even n en oneven voor oneven n
+    Ok(if x < 0.0 && n.rem_euclid(2) == 1 { -r } else { r })
+}
+
+/// Bolfunctie van Bessel y_n(x) = √(π/2x) Y_{n+½}(x), x > 0.
+pub fn sph_y(n: i32, x: f64) -> Result<f64, Error> {
+    if x <= 0.0 {
+        return Err(dom("ys(n, x) bestaat alleen voor x > 0"));
+    }
+    Ok((PI / (2.0 * x)).sqrt() * bessel_yv(n as f64 + 0.5, x)?)
+}
+
+const AI0: f64 = 0.355_028_053_887_817_2;
+const BI0: f64 = 0.614_926_627_446_000_7;
+
+/// Airy Ai(x) via Bessel van orde 1/3.
+pub fn airy_ai(x: f64) -> Result<f64, Error> {
+    if x == 0.0 {
+        return Ok(AI0);
+    }
+    let z = 2.0 / 3.0 * x.abs().powf(1.5);
+    if x > 0.0 {
+        if z > 700.0 {
+            return Ok(0.0);
+        }
+        Ok((x / 3.0).sqrt() / PI * bessel_kv(1.0 / 3.0, z)?)
+    } else {
+        let s = (-x).sqrt();
+        Ok(s / 3.0 * (bessel_jv(1.0 / 3.0, z)? + bessel_jv(-1.0 / 3.0, z)?))
+    }
+}
+
+/// Airy Bi(x) via Bessel van orde 1/3.
+pub fn airy_bi(x: f64) -> Result<f64, Error> {
+    if x == 0.0 {
+        return Ok(BI0);
+    }
+    let z = 2.0 / 3.0 * x.abs().powf(1.5);
+    if x > 0.0 {
+        Ok((x / 3.0).sqrt() * (bessel_iv(-1.0 / 3.0, z)? + bessel_iv(1.0 / 3.0, z)?))
+    } else {
+        Ok(((-x) / 3.0).sqrt() * (bessel_jv(-1.0 / 3.0, z)? - bessel_jv(1.0 / 3.0, z)?))
+    }
+}
+// ---------------------------------------------------------------------------------------------
 // Verdelingen (dichtheid d, verdelingsfunctie p, kwantiel q)
 
 pub fn pnorm(z: f64) -> f64 {
@@ -424,6 +568,29 @@ mod tests {
         assert!(close(erf(-0.5), -0.520_499_877_813_046_5, 1e-14));
         assert!(close(digamma(1.0).unwrap(), -0.577_215_664_901_532_9, 1e-13));
         assert!(close(beta(2.0, 3.0), 1.0 / 12.0, 1e-14));
+    }
+
+    #[test]
+    fn bessel_gebroken_orde_en_airy() {
+        // halftallige orde in gesloten vorm
+        let s = (2.0 / PI).sqrt();
+        assert!(close(bessel_jv(0.5, 1.0).unwrap(), s * 1f64.sin(), 1e-10));
+        assert!(close(bessel_jv(-0.5, 2.0).unwrap(), s / 2f64.sqrt() * 2f64.cos(), 1e-10));
+        assert!(close(bessel_yv(0.5, 1.0).unwrap(), -s * 1f64.cos(), 1e-10));
+        assert!(close(bessel_iv(0.5, 1.0).unwrap(), s * 1f64.sinh(), 1e-10));
+        assert!(close(bessel_kv(0.5, 1.0).unwrap(), (PI / 2.0).sqrt() * (-1f64).exp(), 1e-10));
+        assert!(close(bessel_jv(2.0, 3.0).unwrap(), bessel_j(2, 3.0), 1e-14));
+        // bolfuncties: j1(x) = sin x/x² − cos x/x, y0(x) = −cos x/x
+        let x = 2.5f64;
+        assert!(close(sph_j(1, x).unwrap(), x.sin() / (x * x) - x.cos() / x, 1e-10));
+        assert!(close(sph_j(0, 0.0).unwrap(), 1.0, 1e-15));
+        assert!(close(sph_y(0, x).unwrap(), -x.cos() / x, 1e-10));
+        // Airy (Abramowitz & Stegun, tabel 10.11)
+        assert!(close(airy_ai(1.0).unwrap(), 0.135_292_416_312_881_4, 1e-9));
+        assert!(close(airy_bi(1.0).unwrap(), 1.207_423_594_952_871, 1e-9));
+        assert!(close(airy_ai(-2.0).unwrap(), 0.227_407_428_201_528_1, 1e-9));
+        assert!(close(airy_bi(-2.0).unwrap(), -0.412_302_587_956_398_2, 1e-9));
+        assert!(close(airy_ai(1e-9).unwrap(), 0.355_028_053_6, 1e-8));
     }
 
     #[test]
