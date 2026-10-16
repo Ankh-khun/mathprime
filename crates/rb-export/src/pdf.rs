@@ -114,6 +114,17 @@ fn content(page: &Page, used: &mut Used, images: &mut Images) -> String {
                 }
                 s.push_str(" S\n");
             }
+            Op::Polygon { points, fill, width, color } => {
+                if points.len() < 3 {
+                    continue;
+                }
+                let _ = write!(s, "{} rg {} RG {} w {} {} m", rg(*fill), rg(*color), n(*width), n(points[0].0), n(h - points[0].1));
+                for (x, y) in &points[1..] {
+                    let _ = write!(s, " {} {} l", n(*x), n(h - y));
+                }
+                // vullen, en de rand alleen als die er is
+                s.push_str(if *width > 0.0 { " h B\n" } else { " h f\n" });
+            }
             Op::Fill { x, y, w, h: rh, color } => {
                 let _ = writeln!(s, "{} rg {} {} {} {} re f", rg(*color), n(*x), n(h - y - rh), n(*w), n(*rh));
             }

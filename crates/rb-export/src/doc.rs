@@ -5,7 +5,7 @@
 use crate::font::{fonts, FontId, FontMetrics};
 use crate::view::{region_view, Content, View};
 use rb_layout::{Item, LayoutOptions, MBox, Style};
-use rb_sheet::{Kind, PlotData, Sheet};
+use rb_sheet::{Kind, PlotData, Sheet, Surface};
 use rb_units::format_number;
 
 /// Een kleur (RGB).
@@ -49,6 +49,8 @@ pub enum Op {
     Rect { x: f32, y: f32, w: f32, h: f32, width: f32, color: Color },
     /// Een gevulde rechthoek.
     Fill { x: f32, y: f32, w: f32, h: f32, color: Color },
+    /// Een gevulde veelhoek, met een rand als `width > 0` (vlakjes van een 3D-oppervlak).
+    Polygon { points: Vec<(f32, f32)>, fill: Color, width: f32, color: Color },
     /// Een PNG-afbeelding, linksboven op (x, y). `hash` kenmerkt de inhoud.
     Image { x: f32, y: f32, w: f32, h: f32, png: std::sync::Arc<Vec<u8>>, hash: u64 },
 }
@@ -271,6 +273,7 @@ pub fn shift(o: &Op, dx: f32, dy: f32) -> Op {
         Op::Poly { points, width, color } => Op::Poly { points: points.into_iter().map(|(x, y)| (x + dx, y + dy)).collect(), width, color },
         Op::Rect { x, y, w, h, width, color } => Op::Rect { x: x + dx, y: y + dy, w, h, width, color },
         Op::Fill { x, y, w, h, color } => Op::Fill { x: x + dx, y: y + dy, w, h, color },
+        Op::Polygon { points, fill, width, color } => Op::Polygon { points: points.into_iter().map(|(x, y)| (x + dx, y + dy)).collect(), fill, width, color },
         Op::Image { x, y, w, h, png, hash } => Op::Image { x: x + dx, y: y + dy, w, h, png, hash },
     }
 }
@@ -377,16 +380,35 @@ pub fn axis_value(v: f64, log: bool) -> f64 {
     }
 }
 
+/// Kleur bij t ∈ [0, 1] (laag paars, midden blauwgroen, hoog geel), voor oppervlakken en hoogtelijnen.
+pub fn heat(t: f64) -> Color {
+    const STOPS: [(f64, f64, f64); 3] = [(68.0, 1.0, 84.0), (33.0, 145.0, 140.0), (253.0, 231.0, 37.0)];
+    let t = if t.is_finite() { t.clamp(0.0, 1.0) } else { 0.5 };
+    let (i, f) = if t < 0.5 { (0, t * 2.0) } else { (1, (t - 0.5) * 2.0) };
+    let (a, b) = (STOPS[i], STOPS[i + 1]);
+    let mix = |p: f64, q: f64| (p + (q - p) * f).round() as u8;
+    Color(mix(a.0, b.0), mix(a.1, b.1), mix(a.2, b.2))
+}
+
+/// Standaardblik op een 3D-oppervlak: (draaiing om de verticale as, hoogte), in radialen.
+pub const SURFACE_VIEW: (f64, f64) = (-0.65, 0.55);
+
 /// Teken een grafiek in een kader van `w` × `h` (linksboven op 0, 0).
 pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
+    if let Some(s) = &p.surface {
+        return surface_ops(s, &p.x_label, w, h, size, SURFACE_VIEW);
+    }
     let mut ops = Vec::new();
-    let (left, right, top, bottom) = (52.0, 12.0, 14.0, 30.0);
+    let two_axes = !p.series2.is_empty();
+    let (left, right, top, bottom) = (52.0, if two_axes { 52.0 } else { 12.0 }, 14.0, 30.0);
     let (px, py, pw, ph) = (left, top, w - left - right, h - top - bottom);
     // punten op de assen (log10 bij een logaritmische as)
     let tf = |q: &[f64; 2]| [axis_value(q[0], p.log_x), axis_value(q[1], p.log_y)];
     let series: Vec<Vec<[f64; 2]>> = p.series.iter().map(|s| s.points.iter().map(tf).collect()).collect();
-    let pts: Vec<[f64; 2]> = series.iter().flatten().copied().filter(|q| q[0].is_finite() && q[1].is_finite()).collect();
-    let range = |k: usize| {
+    let series2: Vec<Vec<[f64; 2]>> = p.series2.iter().map(|s| s.points.iter().map(tf).collect()).collect();
+    let finite = |list: &[Vec<[f64; 2]>]| -> Vec<[f64; 2]> { list.iter().flatten().copied().filter(|q| q[0].is_finite() && q[1].is_finite()).collect() };
+    let (pts, pts2) = (finite(&series), finite(&series2));
+    let range = |pts: &[[f64; 2]], k: usize| {
         let lo = pts.iter().map(|q| q[k]).fold(f64::INFINITY, f64::min);
         let hi = pts.iter().map(|q| q[k]).fold(f64::NEG_INFINITY, f64::max);
         if !lo.is_finite() {
@@ -397,16 +419,26 @@ pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
             (lo, hi)
         }
     };
+    let padded = |(a, b): (f64, f64)| {
+        let pad = 0.05 * (b - a);
+        (a - pad, b + pad)
+    };
     // vaste grenzen gaan voor; anders de data, met 5% marge boven en onder
     let fixed = |r: Option<(f64, f64)>, log: bool| r.map(|(a, b)| (axis_value(a, log), axis_value(b, log))).filter(|(a, b)| a < b);
-    let (x0, x1) = fixed(p.x_range, p.log_x).unwrap_or_else(|| range(0));
-    let (y0, y1) = fixed(p.y_range, p.log_y).unwrap_or_else(|| {
-        let (y0, y1) = range(1);
-        let pad = 0.05 * (y1 - y0);
-        (y0 - pad, y1 + pad)
-    });
+    let all_pts: Vec<[f64; 2]> = pts.iter().chain(&pts2).copied().collect();
+    let (mut x0, mut x1) = fixed(p.x_range, p.log_x).unwrap_or_else(|| range(&all_pts, 0));
+    let (mut y0, mut y1) = fixed(p.y_range, p.log_y).unwrap_or_else(|| padded(range(&pts, 1)));
+    // poolgrafiek: x en y even groot, zodat een cirkel rond blijft
+    if p.polar {
+        let s = ((x1 - x0) / pw as f64).max((y1 - y0) / ph as f64);
+        let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+        (x0, x1) = (cx - s * pw as f64 / 2.0, cx + s * pw as f64 / 2.0);
+        (y0, y1) = (cy - s * ph as f64 / 2.0, cy + s * ph as f64 / 2.0);
+    }
+    let (y20, y21) = padded(range(&pts2, 1));
     let sx = |x: f64| px + ((x - x0) / (x1 - x0)) as f32 * pw;
     let sy = |y: f64| py + ph - ((y - y0) / (y1 - y0)) as f32 * ph;
+    let sy2 = |y: f64| py + ph - ((y - y20) / (y21 - y20)) as f32 * ph;
     let small = 0.8 * size;
     // (waarde op de as, label); een leeg label is een tussenstreep
     let ticks = |lo: f64, hi: f64, log: bool, n: usize| -> Vec<(f64, String)> {
@@ -439,23 +471,35 @@ pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
         let lw = fonts().width(&label, small, FontId::Main);
         ops.push(Op::Text { x: px - lw - 4.0, y: y + small * 0.35, size: small, text: label, font: FontId::Main, color: GREY });
     }
+    // de rechter y-as: eigen schaal, alleen streepjes en getallen
+    if two_axes {
+        for t in nice_ticks(y20, y21, 5) {
+            let y = sy2(t);
+            ops.push(Op::Line { x1: px + pw, y1: y, x2: px + pw + 3.0, y2: y, width: 0.6, color: GREY });
+            ops.push(Op::Text { x: px + pw + 5.0, y: y + small * 0.35, size: small, text: format_number(t), font: FontId::Main, color: GREY });
+        }
+    }
     ops.retain(|o| !matches!(o, Op::Text { text, .. } if text.is_empty()));
     ops.push(Op::Rect { x: px, y: py, w: pw, h: ph, width: 0.8, color: GREY });
-    for (k, s) in series.iter().enumerate() {
-        let color = SERIES[k % SERIES.len()];
-        // een NaN onderbreekt de lijn; wat buiten de grenzen valt wordt afgeknipt
-        for run in s.split(|q| !q[0].is_finite() || !q[1].is_finite()).filter(|r| !r.is_empty()) {
-            for seg in clip(run, x0, x1, y0, y1) {
-                let seg: Vec<(f32, f32)> = seg.iter().map(|q| (sx(q[0]), sy(q[1]))).collect();
-                if run.len() == 1 {
-                    let (x, y) = seg[0];
-                    ops.push(Op::Rect { x: x - 1.5, y: y - 1.5, w: 3.0, h: 3.0, width: 1.0, color });
-                } else {
-                    ops.push(Op::Poly { points: seg, width: 1.3, color });
+    let draw = |ops: &mut Vec<Op>, list: &[Vec<[f64; 2]>], first: usize, sy: &dyn Fn(f64) -> f32, (lo, hi): (f64, f64)| {
+        for (k, s) in list.iter().enumerate() {
+            let color = SERIES[(first + k) % SERIES.len()];
+            // een NaN onderbreekt de lijn; wat buiten de grenzen valt wordt afgeknipt
+            for run in s.split(|q| !q[0].is_finite() || !q[1].is_finite()).filter(|r| !r.is_empty()) {
+                for seg in clip(run, x0, x1, lo, hi) {
+                    let seg: Vec<(f32, f32)> = seg.iter().map(|q| (sx(q[0]), sy(q[1]))).collect();
+                    if run.len() == 1 {
+                        let (x, y) = seg[0];
+                        ops.push(Op::Rect { x: x - 1.5, y: y - 1.5, w: 3.0, h: 3.0, width: 1.0, color });
+                    } else {
+                        ops.push(Op::Poly { points: seg, width: 1.3, color });
+                    }
                 }
             }
         }
-    }
+    };
+    draw(&mut ops, &series, 0, &sy, (y0, y1));
+    draw(&mut ops, &series2, series.len(), &sy2, (y20, y21));
     // aslabels en legenda
     let xl = &p.x_label;
     let xw = fonts().width(xl, small, FontId::Main);
@@ -463,17 +507,163 @@ pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
     if !p.y_label.is_empty() {
         ops.push(Op::Text { x: 2.0, y: top - 4.0, size: small, text: p.y_label.clone(), font: FontId::Main, color: BLACK });
     }
+    if two_axes && !p.y2_label.is_empty() {
+        let lw = fonts().width(&p.y2_label, small, FontId::Main);
+        ops.push(Op::Text { x: w - lw - 2.0, y: top - 4.0, size: small, text: p.y2_label.clone(), font: FontId::Main, color: BLACK });
+    }
+    let labels: Vec<String> = p
+        .series
+        .iter()
+        .map(|s| s.label.clone())
+        .chain(p.series2.iter().map(|s| format!("{} (rechts)", s.label)))
+        .collect();
     let mut ly = py + small + 4.0;
-    let legend_w = p.series.iter().map(|s| fonts().width(&s.label, small, FontId::Main)).fold(0.0, f32::max) + 26.0;
-    ops.push(Op::Fill { x: px + pw - legend_w - 4.0, y: py + 3.0, w: legend_w + 1.0, h: p.series.len() as f32 * small * 1.3 + 4.0, color: Color(255, 255, 255) });
-    for (k, s) in p.series.iter().enumerate() {
+    let legend_w = labels.iter().map(|l| fonts().width(l, small, FontId::Main)).fold(0.0, f32::max) + 26.0;
+    ops.push(Op::Fill { x: px + pw - legend_w - 4.0, y: py + 3.0, w: legend_w + 1.0, h: labels.len() as f32 * small * 1.3 + 4.0, color: Color(255, 255, 255) });
+    for (k, l) in labels.iter().enumerate() {
         let color = SERIES[k % SERIES.len()];
-        let lw = fonts().width(&s.label, small, FontId::Main);
+        let lw = fonts().width(l, small, FontId::Main);
         let lx = px + pw - lw - 6.0;
         ops.push(Op::Line { x1: lx - 16.0, y1: ly - small * 0.3, x2: lx - 4.0, y2: ly - small * 0.3, width: 1.5, color });
-        ops.push(Op::Text { x: lx, y: ly, size: small, text: s.label.clone(), font: FontId::Main, color: BLACK });
+        ops.push(Op::Text { x: lx, y: ly, size: small, text: l.clone(), font: FontId::Main, color: BLACK });
         ly += small * 1.3;
     }
+    ops
+}
+
+/// Hoogtelijnen (marching squares) van een oppervlak: per niveau de lijnstukjes in (x, y).
+pub fn contour_segments(s: &Surface, level: f64) -> Vec<[[f64; 2]; 2]> {
+    let (nx, ny) = (s.xs.len(), s.ys.len());
+    let z = |i: usize, j: usize| s.z[j * nx + i];
+    let mut out = Vec::new();
+    for j in 0..ny.saturating_sub(1) {
+        for i in 0..nx.saturating_sub(1) {
+            // hoeken tegen de klok in: (i,j) (i+1,j) (i+1,j+1) (i,j+1)
+            let c = [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)];
+            let v: Vec<f64> = c.iter().map(|&(a, b)| z(a, b)).collect();
+            if v.iter().any(|x| !x.is_finite()) {
+                continue;
+            }
+            // snijpunten op de vier randen
+            let mut cross = Vec::new();
+            for e in 0..4 {
+                let (a, b) = (e, (e + 1) % 4);
+                if (v[a] < level) != (v[b] < level) {
+                    let t = (level - v[a]) / (v[b] - v[a]);
+                    let (pa, pb) = ([s.xs[c[a].0], s.ys[c[a].1]], [s.xs[c[b].0], s.ys[c[b].1]]);
+                    cross.push([pa[0] + t * (pb[0] - pa[0]), pa[1] + t * (pb[1] - pa[1])]);
+                }
+            }
+            match cross.len() {
+                2 => out.push([cross[0], cross[1]]),
+                // zadelpunt: twee stukjes
+                4 => {
+                    out.push([cross[0], cross[1]]);
+                    out.push([cross[2], cross[3]]);
+                }
+                _ => {}
+            }
+        }
+    }
+    out
+}
+
+/// Een oppervlak tekenen: als 3D-vlakjes gezien vanuit `view`, of als hoogtelijnen (`contour`).
+pub fn surface_ops(s: &Surface, x_label: &str, w: f32, h: f32, size: f32, view: (f64, f64)) -> Vec<Op> {
+    let mut ops = Vec::new();
+    let small = 0.8 * size;
+    let zs: Vec<f64> = s.z.iter().copied().filter(|z| z.is_finite()).collect();
+    let (zmin, zmax) = (zs.iter().copied().fold(f64::INFINITY, f64::min), zs.iter().copied().fold(f64::NEG_INFINITY, f64::max));
+    let zspan = if zmax > zmin { zmax - zmin } else { 1.0 };
+    let (nx, ny) = (s.xs.len(), s.ys.len());
+    let (xa, xb, ya, yb) = (s.xs[0], s.xs[nx - 1], s.ys[0], s.ys[ny - 1]);
+    if s.contour {
+        let (left, right, top, bottom) = (52.0, 60.0, 14.0, 30.0);
+        let (px, py, pw, ph) = (left, top, w - left - right, h - top - bottom);
+        let sx = |x: f64| px + ((x - xa) / (xb - xa)) as f32 * pw;
+        let sy = |y: f64| py + ph - ((y - ya) / (yb - ya)) as f32 * ph;
+        for t in nice_ticks(xa.min(xb), xa.max(xb), 6) {
+            ops.push(Op::Line { x1: sx(t), y1: py, x2: sx(t), y2: py + ph, width: 0.5, color: LIGHT });
+            let label = format_number(t);
+            let lw = fonts().width(&label, small, FontId::Main);
+            ops.push(Op::Text { x: sx(t) - lw / 2.0, y: py + ph + small + 3.0, size: small, text: label, font: FontId::Main, color: GREY });
+        }
+        for t in nice_ticks(ya.min(yb), ya.max(yb), 5) {
+            ops.push(Op::Line { x1: px, y1: sy(t), x2: px + pw, y2: sy(t), width: 0.5, color: LIGHT });
+            let label = format_number(t);
+            let lw = fonts().width(&label, small, FontId::Main);
+            ops.push(Op::Text { x: px - lw - 4.0, y: sy(t) + small * 0.35, size: small, text: label, font: FontId::Main, color: GREY });
+        }
+        ops.push(Op::Rect { x: px, y: py, w: pw, h: ph, width: 0.8, color: GREY });
+        let levels: Vec<f64> = nice_ticks(zmin, zmax, 10).into_iter().filter(|l| *l > zmin && *l < zmax).collect();
+        for (k, l) in levels.iter().enumerate() {
+            let color = heat((l - zmin) / zspan);
+            for seg in contour_segments(s, *l) {
+                ops.push(Op::Line { x1: sx(seg[0][0]), y1: sy(seg[0][1]), x2: sx(seg[1][0]), y2: sy(seg[1][1]), width: 1.1, color });
+            }
+            // de schaal rechts: een blokje per niveau
+            let ly = py + ph - (k as f32 + 1.0) * (ph / (levels.len() as f32 + 1.0));
+            ops.push(Op::Fill { x: px + pw + 6.0, y: ly - 4.0, w: 8.0, h: 8.0, color });
+            ops.push(Op::Text { x: px + pw + 17.0, y: ly + small * 0.35, size: small, text: format_number(*l), font: FontId::Main, color: GREY });
+        }
+        let xw = fonts().width(x_label, small, FontId::Main);
+        ops.push(Op::Text { x: px + pw / 2.0 - xw / 2.0, y: h - 4.0, size: small, text: x_label.to_string(), font: FontId::Main, color: BLACK });
+        ops.push(Op::Text { x: 2.0, y: top - 4.0, size: small, text: s.y_label.clone(), font: FontId::Main, color: BLACK });
+        let zw = fonts().width(&s.z_label, small, FontId::Main);
+        ops.push(Op::Text { x: w - zw - 2.0, y: top - 4.0, size: small, text: s.z_label.clone(), font: FontId::Main, color: BLACK });
+        return ops;
+    }
+    // 3D: x, y en z naar [-1, 1], draaien om de verticale as (az) en kantelen (el)
+    let (az, el) = view;
+    let norm = |v: f64, a: f64, b: f64| if b != a { 2.0 * (v - a) / (b - a) - 1.0 } else { 0.0 };
+    let project = |x: f64, y: f64, z: f64| -> (f64, f64, f64) {
+        let (u, v, zz) = (norm(x, xa, xb), norm(y, ya, yb), 0.8 * norm(z, zmin, zmin + zspan));
+        let (rx, ry) = (u * az.cos() - v * az.sin(), u * az.sin() + v * az.cos());
+        // kantelen om de horizontale as: diepte en hoogte op het scherm
+        let depth = ry * el.cos() - zz * el.sin();
+        let up = ry * el.sin() + zz * el.cos();
+        (rx, up, depth)
+    };
+    let (cx, cy) = (w as f64 / 2.0, (h as f64 - 14.0) / 2.0 + 4.0);
+    let scale = (w as f64 / 3.2).min((h as f64 - 14.0) / 3.1);
+    let screen = |(rx, up, _): (f64, f64, f64)| ((cx + rx * scale) as f32, (cy - up * scale) as f32);
+    // de bodem en de verticale as
+    let corners = [(xa, ya), (xb, ya), (xb, yb), (xa, yb)];
+    let base: Vec<(f32, f32)> = corners.iter().map(|&(x, y)| screen(project(x, y, zmin))).collect();
+    ops.push(Op::Polygon { points: base.clone(), fill: Color(246, 247, 250), width: 0.6, color: LIGHT });
+    let back = corners.iter().map(|&(x, y)| project(x, y, zmin)).enumerate().max_by(|a, b| a.1 .2.total_cmp(&b.1 .2)).map(|(k, _)| k).unwrap_or(0);
+    let (bx, by) = corners[back];
+    let (ax0, ay0) = screen(project(bx, by, zmin));
+    let (ax1, ay1) = screen(project(bx, by, zmax));
+    ops.push(Op::Line { x1: ax0, y1: ay0, x2: ax1, y2: ay1, width: 0.6, color: GREY });
+    // vlakjes van achter naar voor (schilder-algoritme)
+    let mut quads: Vec<(f64, Vec<(f32, f32)>, Color)> = Vec::new();
+    for j in 0..ny - 1 {
+        for i in 0..nx - 1 {
+            let c = [(i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1)];
+            let zc: Vec<f64> = c.iter().map(|&(a, b)| s.z[b * nx + a]).collect();
+            if zc.iter().any(|z| !z.is_finite()) {
+                continue;
+            }
+            let pr: Vec<(f64, f64, f64)> = c.iter().zip(&zc).map(|(&(a, b), &z)| project(s.xs[a], s.ys[b], z)).collect();
+            let depth = pr.iter().map(|q| q.2).sum::<f64>() / 4.0;
+            let mean = zc.iter().sum::<f64>() / 4.0;
+            quads.push((depth, pr.into_iter().map(screen).collect(), heat((mean - zmin) / zspan)));
+        }
+    }
+    quads.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let edge = if nx * ny <= 1600 { 0.25 } else { 0.0 };
+    for (_, pts, fill) in quads {
+        ops.push(Op::Polygon { points: pts, fill, width: edge, color: Color(70, 70, 80) });
+    }
+    // labels: x en y halverwege de randen, z bij de as
+    let mid = |a: (f32, f32), b: (f32, f32)| ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
+    let (lx, ly) = mid(base[0], base[1]);
+    ops.push(Op::Text { x: lx, y: ly + small + 4.0, size: small, text: x_label.to_string(), font: FontId::Main, color: BLACK });
+    let (lx, ly) = mid(base[1], base[2]);
+    ops.push(Op::Text { x: lx + 4.0, y: ly + small + 4.0, size: small, text: s.y_label.clone(), font: FontId::Main, color: BLACK });
+    ops.push(Op::Text { x: ax1 + 4.0, y: ay1, size: small, text: format!("{} {}", format_number(zmax), s.z_label), font: FontId::Main, color: GREY });
+    ops.push(Op::Text { x: ax0 + 4.0, y: ay0, size: small, text: format_number(zmin), font: FontId::Main, color: GREY });
     ops
 }
 
@@ -833,6 +1023,27 @@ mod tests {
         assert!(t.iter().all(|(_, m)| *m) && t.len() < 20);
         assert_eq!(axis_value(100.0, true), 2.0);
         assert!(axis_value(0.0, true).is_nan() && axis_value(-1.0, false) == -1.0);
+    }
+
+    #[test]
+    fn hoogtelijnen() {
+        // z = x + y op een 3 × 3 rooster: de lijn z = 1 loopt van (1, 0) naar (0, 1)
+        let s = Surface {
+            xs: vec![0.0, 1.0, 2.0],
+            ys: vec![0.0, 1.0, 2.0],
+            z: vec![0.0, 1.0, 2.0, 1.0, 2.0, 3.0, 2.0, 3.0, 4.0],
+            y_label: String::new(),
+            z_label: String::new(),
+            contour: true,
+        };
+        let segs = contour_segments(&s, 1.5);
+        assert!(!segs.is_empty());
+        assert!(segs.iter().flatten().all(|p| (p[0] + p[1] - 1.5).abs() < 1e-12));
+        // tekenen: 3D en hoogtelijnen geven allebei iets
+        assert!(surface_ops(&s, "x", 400.0, 220.0, 10.0, SURFACE_VIEW).iter().any(|o| matches!(o, Op::Line { .. })));
+        let flat = Surface { contour: false, ..s };
+        assert!(surface_ops(&flat, "x", 400.0, 220.0, 10.0, SURFACE_VIEW).iter().any(|o| matches!(o, Op::Polygon { .. })));
+        assert!(heat(0.0) != heat(1.0));
     }
 
     #[test]

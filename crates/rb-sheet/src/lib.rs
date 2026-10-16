@@ -13,6 +13,6 @@ pub mod table;
 
 pub use graph::{Graph, Issue, Warning};
 pub use parse::{mark_given_blocks, parse_kind, parse_sheet, sort_regions, Image, Kind, Pos, Region, SweepSpec, SOLVERS};
-pub use plot::{PlotData, PlotOptions, PlotSpec, PlotX, Series};
+pub use plot::{PlotData, PlotOptions, PlotSpec, PlotX, Series, Surface};
 pub use sheet::{plot_summary, Output, Sheet};
 pub use table::TableSpec;

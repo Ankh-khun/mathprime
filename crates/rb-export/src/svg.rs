@@ -111,6 +111,11 @@ pub fn to_svg(pages: &[Page]) -> String {
                 Op::Fill { x, y, w, h, color } => {
                     let _ = writeln!(s, r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}"/>"#, f(*x), f(*y), f(*w), f(*h), rgb(*color));
                 }
+                Op::Polygon { points, fill, width, color } => {
+                    let pts: Vec<String> = points.iter().map(|(x, y)| format!("{},{}", f(*x), f(*y))).collect();
+                    let stroke = if *width > 0.0 { format!(r#" stroke="{}" stroke-width="{}" stroke-linejoin="round""#, rgb(*color), f(*width)) } else { String::new() };
+                    let _ = writeln!(s, r#"<polygon points="{}" fill="{}"{stroke}/>"#, pts.join(" "), rgb(*fill));
+                }
                 Op::Rect { x, y, w, h, width, color } => {
                     let _ = writeln!(
                         s,
