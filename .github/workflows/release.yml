@@ -1,0 +1,74 @@
+# Een tag vX.Y.Z pushen maakt een GitHub-release met het installatiepakket en een zip.
+#   git tag v1.5.0 && git push origin v1.5.0
+# De tag moet gelijk zijn aan de versie in Cargo.toml. Release-notities komen uit
+# docs/releases/<tag>.md als dat bestand bestaat, anders maakt GitHub ze uit de commits.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-release-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Versie controleren
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "tag ${{ github.ref_name }} past niet bij versie $v in Cargo.toml" }
+          "VERSIE=$v" >> $env:GITHUB_ENV
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Bouwen
+        run: cargo build --release -p rb-gui -p rb-cli
+
+      # IExpress hoort bij Windows, maar staat niet op elke runner: dan alleen de zip
+      - name: Installatiepakket (IExpress)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "$env:SystemRoot\System32\iexpress.exe")) { throw "IExpress ontbreekt op deze runner" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools\maak-installer.ps1 -NietBouwen
+
+      - name: Zip (zonder installatie)
+        shell: pwsh
+        run: |
+          $map = "target\zip\MathPrime-$env:VERSIE"
+          New-Item -ItemType Directory -Force $map | Out-Null
+          Copy-Item target\release\mathprime.exe, target\release\mathprime-cli.exe $map
+          Copy-Item README.md "$map\LEESMIJ.md"
+          Copy-Item examples\*.rkn $map
+          Compress-Archive -Path $map -DestinationPath "target\MathPrime-$env:VERSIE-windows-x64.zip" -Force
+
+      - name: Release maken
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = @("target\MathPrime-$env:VERSIE-windows-x64.zip")
+          $setup = "target\installer\MathPrime-$env:VERSIE-setup.exe"
+          if (Test-Path $setup) { $files += $setup }
+          $notes = "docs\releases\${{ github.ref_name }}.md"
+          if (Test-Path $notes) {
+            gh release create "${{ github.ref_name }}" @files --title "MathPrime $env:VERSIE" --notes-file $notes
+          } else {
+            gh release create "${{ github.ref_name }}" @files --title "MathPrime $env:VERSIE" --generate-notes
+          }

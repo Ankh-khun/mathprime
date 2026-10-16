@@ -1,0 +1,36 @@
+# Bij elke push naar main en elk pull request: alle tests op Windows.
+# De vergelijking met echte Mathcad-bladen slaat zichzelf over (MATHPRIME_MCDX_DIRS staat hier niet).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: Release-build zonder warnings
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo build --release -p rb-gui -p rb-cli
