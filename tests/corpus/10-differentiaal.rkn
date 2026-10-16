@@ -1,0 +1,32 @@
+" Stelsel: x' = y, y' = -x geeft x = cos t
+Given
+x'(t) == y(t)
+y'(t) == -x(t)
+x(0) == 1
+y(0) == 0
+[x; y] := odesolve([x; y], t, 4)
+x(π) =        // verwacht: -1
+y(π/2) =      // verwacht: -1
+" Randwaardeprobleem: v'' + v = 0, v(0) = 0, v(π/2) = 1 geeft v = sin s
+Given
+v''(s) + v(s) == 0
+v(0) == 0
+v(π/2) == 1
+v := odesolve(s, 3)
+v(π/6) =      // verwacht: 0.5
+" Ligger: doorbuiging in het midden is 5 q L^4 / (384 EI)
+q := 10 kN/m
+EI := 20000 kN*m^2
+L := 6 m
+Given
+w''''(z) == q / EI
+w(0 m) == 0 m
+w''(0 m) == 0
+w(L) == 0 m
+w''(L) == 0
+w := odesolve(z, L)
+w(L/2) = mm   // verwacht: 8.4375 mm
+" Stijf: Radau voor y' = -y geeft e^-2 in x = 2
+D(u, v) := [-v[0]]
+R := Radau([1], 0, 2, 4, D)
+R[4, 1] =     // verwacht: 0.135335

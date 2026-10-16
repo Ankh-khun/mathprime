@@ -1,0 +1,12 @@
+" Limieten (l'Hôpital en naar oneindig)
+sin(x) / x → limit, x = 0                     // verwacht: 1
+(3*x^2 + 1) / (x^2 + 5) → limit, x = ∞        // verwacht: 3
+" Taylorreeks en integralen
+exp(x) → series, x = 0, 3                     // verwacht: x^2 / 2 + x + 1
+integral(x * exp(x), x, 0, 1) →               // verwacht: 1
+integral(sin(2*x), x, 0, π/2) →               // verwacht: 1
+" Eenheden bij de pijl
+F := 10 kN
+a := 2 m
+F * a →                                       // verwacht: 20 * kN * m
+1 m + 50 cm →                                 // verwacht: 1.5 * m

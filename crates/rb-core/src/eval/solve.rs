@@ -182,7 +182,10 @@ impl Env {
     /// `rkfixed(y, x1, x2, n, D)` en `Rkadapt(...)`: matrix met x in kolom 0 en y in de volgende kolommen.
     fn ode_fixed(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
         Self::want(name, args, 5)?;
-        let y0 = components(&self.eval(&args[0], loc, depth)?, "de beginwaarde y")?;
+        let init = self.eval(&args[0], loc, depth)?;
+        // een beginwaarde als vector ([1]) geeft D ook een vector, zoals in Mathcad (y[0] werkt dan)
+        let as_vector = matches!(init, Value::Matrix(_));
+        let y0 = components(&init, "de beginwaarde y")?;
         let x1 = real(self.eval(&args[1], loc, depth)?, "x1")?;
         let x2 = real(self.eval(&args[2], loc, depth)?, "x2")?;
         x1.same_dim(x2, "de grenzen van de differentiaalvergelijking")?;
@@ -197,7 +200,8 @@ impl Env {
             .map(|yd| yd.checked_div(x1.dim).ok_or(rb_units::UnitError::Overflow))
             .collect::<Result<_, _>>()?;
         let mut rhs = |x: f64, y: &[f64]| -> Result<Vec<f64>, Error> {
-            let yv = vector_value(y.iter().zip(&ydims).map(|(v, d)| Quantity::new(*v, *d)).collect());
+            let qs: Vec<Quantity> = y.iter().zip(&ydims).map(|(v, d)| Quantity::new(*v, *d)).collect();
+            let yv = if as_vector { Value::Matrix(Matrix::column(qs)) } else { vector_value(qs) };
             let out = components(&self.call_user(d, vec![Value::Num(Quantity::new(x, x1.dim)), yv], depth)?, "D(x, y)")?;
             if out.len() != y.len() {
                 return Err(dom(format!("{name}: D(x, y) moet evenveel componenten geven als y ({})", y.len())));
