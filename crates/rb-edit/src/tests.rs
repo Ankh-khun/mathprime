@@ -198,6 +198,8 @@ fn bestaande_regels_bewerken_en_terug() {
         "T := 20 °C",
         "M := q * L^2 / 8 = kN*m",
         "v := 3 m/s =",
+        "y := odesolve(t, 10)",
+        "[x; y] := odesolve([x; y], t, 4)",
         "f(n) := {\n    s := 0\n    for k in 1..n\n        if mod(k, 2) == 0\n            continue\n        s := s + k\n    return s\n}",
     ];
     for l in lines {

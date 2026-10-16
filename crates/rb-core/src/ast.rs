@@ -33,8 +33,24 @@ pub enum BindOp {
     Deriv,
     /// `root(uitdrukking, x)` (startwaarde = huidige x) of `root(uitdrukking, x, a, b)`
     Root,
-    /// `odesolve(t, b)` in een Given-blok; de body is niet gebruikt
+    /// `odesolve(t, b)` in een Given-blok; de body is 0, of bij een stelsel
+    /// (`odesolve([x; y], t, b)`) de vector met de namen van de functies
     OdeSolve,
+}
+
+/// De namen in een vector als `[x; y]` (de functies van een stelsel bij odesolve).
+pub fn ode_names(e: &Expr) -> Option<Vec<String>> {
+    match e {
+        Expr::Matrix(rows) => rows
+            .iter()
+            .flatten()
+            .map(|x| match x {
+                Expr::Var(n) => Some(n.clone()),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
+    }
 }
 
 /// Een getabelleerde functie (uitkomst van `odesolve`): kubische Hermite-interpolatie.
@@ -227,6 +243,10 @@ impl Expr {
                 if *op == BindOp::Root && args.is_empty() && !bound.contains(var) {
                     out.insert(var.clone());
                 }
+                // bij odesolve staan in de body alleen de namen van de functies die het definieert
+                if *op == BindOp::OdeSolve {
+                    return;
+                }
                 let mut inner = bound.clone();
                 inner.insert(var.clone());
                 body.collect_names(&inner, out);
@@ -325,6 +345,19 @@ impl Stmt {
         match self {
             Stmt::Define { name, .. } => Some(name),
             Stmt::Eval { .. } | Stmt::Symbolic { .. } => None,
+        }
+    }
+
+    /// Alle namen die deze regel definieert: één, of meer bij een stelsel `[x; y] := odesolve([x; y], t, b)`.
+    pub fn defines_all(&self) -> Vec<String> {
+        self.ode_system().unwrap_or_else(|| self.defines().map(str::to_string).into_iter().collect())
+    }
+
+    /// De functies van een stelsel differentiaalvergelijkingen (`[x; y] := odesolve([x; y], t, b)`).
+    pub fn ode_system(&self) -> Option<Vec<String>> {
+        match self {
+            Stmt::Define { body: Expr::Bind { op: BindOp::OdeSolve, body, .. }, .. } => ode_names(body),
+            _ => None,
         }
     }
 

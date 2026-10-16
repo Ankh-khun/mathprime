@@ -65,6 +65,8 @@ impl Defined {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Outcome {
     Defined(Defined),
+    /// Meer definities tegelijk: de functies van een stelsel (`[x; y] := odesolve([x; y], t, b)`).
+    DefinedAll(Vec<Defined>),
     Value {
         value: Value,
         lhs_src: String,
@@ -1271,12 +1273,14 @@ impl Env {
             })),
             Stmt::Define {
                 name,
-                body: Expr::Bind { op: BindOp::OdeSolve, var, args, .. },
+                body: Expr::Bind { op: BindOp::OdeSolve, var, args, body },
                 ..
-            } => Ok(Outcome::Defined(Defined::Fn {
-                name: name.clone(),
-                func: self.odesolve(name, var, &args[0])?,
-            })),
+            } => {
+                let names = crate::ast::ode_names(body).unwrap_or_else(|| vec![name.clone()]);
+                let funcs = self.odesolve(&names, var, &args[0])?;
+                let mut defs: Vec<Defined> = names.into_iter().zip(funcs).map(|(name, func)| Defined::Fn { name, func }).collect();
+                Ok(if defs.len() == 1 { Outcome::Defined(defs.remove(0)) } else { Outcome::DefinedAll(defs) })
+            }
             Stmt::Define { name, body, .. } => {
                 let ranges = self.range_vars(&[body]);
                 let (value, hint) = if ranges.is_empty() || matches!(body, Expr::Range { .. }) {
@@ -1338,6 +1342,12 @@ impl Env {
         match self.eval_stmt(&stmt)? {
             Outcome::Defined(d) => {
                 self.apply(d);
+                Ok(None)
+            }
+            Outcome::DefinedAll(ds) => {
+                for d in ds {
+                    self.apply(d);
+                }
                 Ok(None)
             }
             Outcome::Value {

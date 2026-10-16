@@ -269,7 +269,9 @@ impl L<'_> {
                 row(vec![self.text("root", size), fence(self.list(&items, size), '(', size)])
             }
             BindOp::OdeSolve => {
-                let mut items = vec![Expr::Var(var.to_string())];
+                // bij een stelsel eerst de vector met functies: odesolve([x; y], t, b)
+                let mut items: Vec<Expr> = matches!(body, Expr::Matrix(_)).then(|| body.clone()).into_iter().collect();
+                items.push(Expr::Var(var.to_string()));
                 items.extend(args.iter().cloned());
                 row(vec![self.text("odesolve", size), fence(self.list(&items, size), '(', size)])
             }
@@ -387,7 +389,11 @@ pub fn stmt_box(m: &dyn Metrics, stmt: &Stmt, result: Option<MBox>, opts: Layout
                     row(vec![l.name(name, size), fence(l.list(&args, size), '(', size)])
                 }
                 (None, Some(idx)) => sub(l.name(name, size), l.list(idx, script_size(size)), size),
-                (None, None) => l.name(name, size),
+                // een stelsel: [x; y] := odesolve([x; y], t, b)
+                (None, None) => match stmt.ode_system() {
+                    Some(names) => l.expr(&Expr::Matrix(names.into_iter().map(|n| vec![Expr::Var(n)]).collect()), size),
+                    None => l.name(name, size),
+                },
             };
             let mut parts = vec![lhs, l.op(":=", size), l.expr(body, size)];
             // `a := ... = waarde`, zoals in Mathcad

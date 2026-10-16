@@ -228,130 +228,298 @@ impl Env {
         Ok(Value::Matrix(Matrix::new(n + 1, cols, data)))
     }
 
-    /// `y := odesolve(t, b)`: los de differentiaalvergelijking in het Given-blok op van het
-    /// beginpunt tot b. Geeft een functie y(t) (kubische Hermite-interpolatie in 1000 stappen).
-    pub(super) fn odesolve(&self, fname: &str, tvar: &str, end: &Expr) -> Result<UserFn, Error> {
+    /// `y := odesolve(t, b)` en `[x; y] := odesolve([x; y], t, b)`: los de differentiaalvergelijking(en) in
+    /// het Given-blok op, van het beginpunt tot b. Staan alle voorwaarden in één punt, dan is dat een
+    /// beginwaardeprobleem; staan ze in meer punten (`y(0) == 0`, `y(L) == 0`), dan een randwaardeprobleem,
+    /// opgelost met de schietmethode: de ontbrekende beginwaarden worden gezocht tot de andere voorwaarden
+    /// kloppen. Geeft per functie een tabel (kubische Hermite-interpolatie in 1000 stappen).
+    pub(super) fn odesolve(&self, fnames: &[String], tvar: &str, end: &Expr) -> Result<Vec<UserFn>, Error> {
         if self.constraints.is_empty() {
             return Err(dom("odesolve hoort onder een Given-blok met de differentiaalvergelijking en de beginvoorwaarden"));
         }
-        let order = |n: &str| -> Option<usize> {
-            (n.trim_end_matches('\'') == fname).then(|| n.len() - n.trim_end_matches('\'').len())
+        let m = fnames.len();
+        // `y''` → (welke functie, orde)
+        let which = |n: &str| -> Option<(usize, usize)> {
+            let base = n.trim_end_matches('\'');
+            fnames.iter().position(|f| f == base).map(|i| (i, n.len() - base.len()))
         };
-        // de vergelijking zelf: bevat y^(k)(t); de rest zijn beginvoorwaarden y^(k)(a) == waarde
-        let mut ode: Option<Expr> = None;
-        let mut max_order = 0;
-        let mut ics: Vec<(usize, Quantity, Quantity)> = Vec::new();
+        let label = |i: usize, k: usize| format!("{}{}", fnames[i], "'".repeat(k));
+        // de vergelijkingen bevatten y^(k)(t); de rest zijn voorwaarden y^(k)(p) == waarde
+        let mut odes: Vec<Expr> = Vec::new();
+        let mut orders = vec![0usize; m];
+        let mut conds: Vec<(usize, usize, Quantity, Quantity)> = Vec::new();
         for c in &self.constraints {
             let (l, r) = match c {
                 Expr::Cmp(ops, xs) if ops.len() == 1 && ops[0] == CmpOp::Eq => (&xs[0], &xs[1]),
                 _ => return Err(dom("odesolve: elke beperking moet een gelijkheid met == zijn")),
             };
             let mut found = Vec::new();
-            find_calls(c, &order, tvar, &mut found);
-            if found.iter().any(|(_, on_t)| *on_t) {
-                if ode.is_some() {
+            find_calls(c, &which, tvar, &mut found);
+            if found.iter().any(|f| f.2) {
+                if m == 1 && !odes.is_empty() {
                     return Err(dom("odesolve: er mag maar één differentiaalvergelijking in het blok staan"));
                 }
-                max_order = found.iter().filter(|(_, t)| *t).map(|(k, _)| *k).max().unwrap_or(0);
-                if max_order == 0 {
-                    return Err(dom(format!("odesolve: de vergelijking bevat geen afgeleide van {fname}")));
+                for &(i, k, on_t) in &found {
+                    if on_t {
+                        orders[i] = orders[i].max(k);
+                    }
                 }
                 // een kale 0 aan één kant past bij elke eenheid: dan is de andere kant het residu
-                let (l, r) = (substitute(l, &order, tvar), substitute(r, &order, tvar));
-                ode = Some(match (&l, &r) {
+                let (l, r) = (substitute(l, &which, tvar), substitute(r, &which, tvar));
+                odes.push(match (&l, &r) {
                     (_, Expr::Num(z)) if *z == 0.0 => l,
                     (Expr::Num(z), _) if *z == 0.0 => r,
                     _ => Expr::Bin(BinOp::Sub, Box::new(l), Box::new(r)),
                 });
                 continue;
             }
-            // beginvoorwaarde: y^(k)(a) == waarde (of andersom)
             let (call, other) = match (l, r) {
-                (Expr::Call(n, a), o) | (o, Expr::Call(n, a)) if order(n).is_some() && a.len() == 1 => ((n, &a[0]), o),
-                _ => return Err(dom(format!("odesolve: een beginvoorwaarde schrijf je als {fname}(0) == 1 of {fname}'(0) == 0"))),
+                (Expr::Call(n, a), o) | (o, Expr::Call(n, a)) if which(n).is_some() && a.len() == 1 => ((n, &a[0]), o),
+                _ => return Err(dom(format!("odesolve: een beginvoorwaarde schrijf je als {f}(0) == 1 of {f}'(0) == 0", f = fnames[0]))),
             };
-            let k = order(call.0).unwrap();
+            let (i, k) = which(call.0).unwrap();
             let at = real(self.eval_expr(call.1)?, "het beginpunt")?;
             let val = real(self.eval_expr(other)?, "een beginwaarde")?;
-            ics.push((k, at, val));
+            conds.push((i, k, at, val));
         }
-        let ode = ode.ok_or_else(|| dom(format!("odesolve: geen differentiaalvergelijking met {fname}'({tvar}) gevonden")))?;
-        let a = ics.first().map(|ic| ic.1).ok_or_else(|| dom("odesolve: beginvoorwaarden ontbreken"))?;
-        let mut init = vec![None; max_order];
-        for (k, at, val) in &ics {
-            if *k >= max_order {
-                return Err(dom("odesolve: een beginvoorwaarde voor de hoogste afgeleide kan niet"));
-            }
-            if at.dim != a.dim || (at.value - a.value).abs() > 1e-12 * a.value.abs().max(1e-300) {
-                return Err(dom("odesolve: alle beginvoorwaarden moeten in hetzelfde punt gelden"));
-            }
-            init[*k] = Some(*val);
+        if odes.is_empty() {
+            return Err(dom(format!("odesolve: geen differentiaalvergelijking met {}'({tvar}) gevonden", fnames[0])));
         }
-        let primes = |k: usize| "'".repeat(k);
-        let init: Vec<Quantity> = init
-            .into_iter()
-            .enumerate()
-            .map(|(k, v)| v.ok_or_else(|| dom(format!("odesolve: de beginvoorwaarde voor {fname}{}({}) ontbreekt", primes(k), a))))
-            .collect::<Result<_, _>>()?;
-        let tdim = a.dim;
-        let ydim = init[0].dim;
-        let dims: Vec<Dim> = (0..=max_order)
-            .map(|k| tdim.checked_powi(k as i32).and_then(|p| ydim.checked_div(p)).ok_or(rb_units::UnitError::Overflow))
-            .collect::<Result<_, _>>()?;
-        for (k, q) in init.iter().enumerate() {
-            if q.dim != dims[k] {
-                return Err(dom(format!(
-                    "odesolve: de beginwaarde van {fname}{} heeft eenheid {}, verwacht {}",
-                    primes(k),
-                    q.dim.describe(),
-                    dims[k].describe()
-                )));
-            }
+        if let Some(i) = orders.iter().position(|&n| n == 0) {
+            let what = if m == 1 { "de vergelijking bevat" } else { "de vergelijkingen bevatten" };
+            return Err(dom(format!("odesolve: {what} geen afgeleide van {}", fnames[i])));
+        }
+        if odes.len() != m {
+            return Err(dom(format!("odesolve: {m} functies vragen {m} differentiaalvergelijkingen, het blok heeft er {}", odes.len())));
         }
         let b = real(self.eval_expr(end)?, "de eindwaarde")?;
+        // het beginpunt: bij een randwaardeprobleem het punt het verst van de eindwaarde
+        let a = conds
+            .iter()
+            .map(|c| c.2)
+            .max_by(|p, q| (p.value - b.value).abs().total_cmp(&(q.value - b.value).abs()))
+            .ok_or_else(|| dom("odesolve: beginvoorwaarden ontbreken"))?;
         b.same_dim(a, "odesolve (beginpunt en eindwaarde)")?;
-        let n = max_order;
+        let tdim = a.dim;
+        // de toestand: per functie y, y', .. tot de orde − 1
+        let offs: Vec<usize> = orders.iter().scan(0, |s, n| Some(std::mem::replace(s, *s + n))).collect();
+        let total: usize = orders.iter().sum();
+        let same = |p: f64| (p - a.value).abs() <= 1e-12 * a.value.abs().max(1e-300);
+        let (lo, hi) = (a.value.min(b.value), a.value.max(b.value));
+        let tol = 1e-9 * (hi - lo);
+        let mut fixed: Vec<Option<f64>> = vec![None; total];
+        let mut targets: Vec<(usize, f64, f64)> = Vec::new();
+        let mut ydims: Vec<Option<Dim>> = vec![None; m];
+        let tpow = |k: usize| tdim.checked_powi(k as i32).ok_or(rb_units::UnitError::Overflow);
+        for &(i, k, at, val) in &conds {
+            if k >= orders[i] {
+                return Err(dom(format!("odesolve: een voorwaarde voor de hoogste afgeleide ({}) kan niet", label(i, k))));
+            }
+            at.same_dim(a, "odesolve (de punten van de voorwaarden)")?;
+            let yd = val.dim.checked_mul(tpow(k)?).ok_or(rb_units::UnitError::Overflow)?;
+            // een kale 0 past bij elke eenheid (w''(0) == 0 bij een balk in meter)
+            let bare_zero = val.value == 0.0 && val.dim == Dim::NONE;
+            match ydims[i] {
+                _ if bare_zero => {}
+                Some(d) if d != yd => {
+                    let want = d.checked_div(tpow(k)?).ok_or(rb_units::UnitError::Overflow)?;
+                    return Err(dom(format!(
+                        "odesolve: de beginwaarde van {} heeft eenheid {}, verwacht {}",
+                        label(i, k),
+                        val.dim.describe(),
+                        want.describe()
+                    )));
+                }
+                _ => ydims[i] = Some(yd),
+            }
+            let idx = offs[i] + k;
+            if same(at.value) {
+                if fixed[idx].replace(val.value).is_some() {
+                    return Err(dom(format!("odesolve: twee voorwaarden voor {}({})", label(i, k), format_quantity(at))));
+                }
+            } else if at.value < lo - tol || at.value > hi + tol {
+                return Err(dom(format!(
+                    "odesolve: de voorwaarde voor {}({}) ligt buiten het bereik van {} tot {}",
+                    label(i, k),
+                    format_quantity(at),
+                    format_quantity(a),
+                    format_quantity(b)
+                )));
+            } else {
+                targets.push((idx, at.value, val.value));
+            }
+        }
+        // per functie evenveel voorwaarden als de orde
+        for i in 0..m {
+            let count = conds.iter().filter(|c| c.0 == i).count();
+            if count > orders[i] {
+                return Err(dom(format!("odesolve: te veel voorwaarden voor {} (de vergelijking is van orde {})", fnames[i], orders[i])));
+            }
+            if count < orders[i] {
+                let k = (0..orders[i]).find(|&k| fixed[offs[i] + k].is_none()).unwrap_or(0);
+                return Err(dom(format!("odesolve: de beginvoorwaarde voor {}({}) ontbreekt", label(i, k), format_quantity(a))));
+            }
+        }
+        let ydims: Vec<Dim> = ydims.into_iter().map(|d| d.unwrap_or(Dim::NONE)).collect();
+        let deriv_dim = |i: usize, k: usize| -> Result<Dim, Error> { Ok(ydims[i].checked_div(tpow(k)?).ok_or(rb_units::UnitError::Overflow)?) };
+        let mut dims = Vec::with_capacity(total);
+        for i in 0..m {
+            for k in 0..orders[i] {
+                dims.push(deriv_dim(i, k)?);
+            }
+        }
+        let top_dims: Vec<Dim> = (0..m).map(|i| deriv_dim(i, orders[i])).collect::<Result<_, _>>()?;
+
+        // de vergelijkingen uitrekenen bij t, de toestand en de hoogste afgeleiden
         let mut base = Locals::new();
-        let residual = |t: f64, s: &[f64], top: f64, base: &mut Locals| -> Result<f64, Error> {
+        let residual = |t: f64, s: &[f64], tops: &[f64], base: &mut Locals| -> Result<Vec<f64>, Error> {
             base.insert(tvar.to_string(), Value::Num(Quantity::new(t, tdim)));
-            for k in 0..n {
-                base.insert(format!("__y{k}"), Value::Num(Quantity::new(s[k], dims[k])));
+            for i in 0..m {
+                for k in 0..orders[i] {
+                    base.insert(format!("__y{i}_{k}"), Value::Num(Quantity::new(s[offs[i] + k], dims[offs[i] + k])));
+                }
+                base.insert(format!("__y{i}_{}", orders[i]), Value::Num(Quantity::new(tops[i], top_dims[i])));
             }
-            base.insert(format!("__y{n}"), Value::Num(Quantity::new(top, dims[n])));
-            Ok(real(self.eval(&ode, base, 0)?, "de differentiaalvergelijking")?.value)
+            odes.iter().map(|e| Ok(real(self.eval(e, base, 0)?, "de differentiaalvergelijking")?.value)).collect()
         };
-        // hoogste afgeleide uit de vergelijking halen (meestal lineair: twee evaluaties volstaan)
+        let singular = || {
+            if m == 1 {
+                dom(format!("odesolve: de vergelijking hangt niet af van {}", label(0, orders[0])))
+            } else {
+                let tops: Vec<String> = (0..m).map(|i| label(i, orders[i])).collect();
+                dom(format!("odesolve: de vergelijkingen leggen {} niet vast", tops.join(", ")))
+            }
+        };
+        // de hoogste afgeleiden uit de vergelijkingen halen: Newton (meestal lineair: één stap)
         let mut rhs = |t: f64, s: &[f64]| -> Result<Vec<f64>, Error> {
-            let r0 = residual(t, s, 0.0, &mut base)?;
-            let r1 = residual(t, s, 1.0, &mut base)?;
-            if r1 == r0 {
-                return Err(dom(format!("odesolve: de vergelijking hangt niet af van {fname}{}", primes(n))));
+            let mut tops = vec![0.0; m];
+            let mut r = residual(t, s, &tops, &mut base)?;
+            for _ in 0..30 {
+                let mut jac = vec![0.0; m * m];
+                for j in 0..m {
+                    let h = tops[j].abs().max(1.0) * 1e-6;
+                    let mut tp = tops.clone();
+                    tp[j] += h;
+                    let rj = residual(t, s, &tp, &mut base)?;
+                    for q in 0..m {
+                        jac[q * m + j] = (rj[q] - r[q]) / h;
+                    }
+                }
+                let size: Vec<f64> = (0..m).map(|q| r[q].abs() + (0..m).map(|j| (jac[q * m + j] * tops[j]).abs()).sum::<f64>()).collect();
+                let delta = numeric::solve_dense(jac, m, r.iter().map(|v| -v).collect()).ok_or_else(singular)?;
+                if delta.iter().any(|d| !d.is_finite()) {
+                    return Err(singular());
+                }
+                for (t, d) in tops.iter_mut().zip(&delta) {
+                    *t += d;
+                }
+                r = residual(t, s, &tops, &mut base)?;
+                if r.iter().zip(&size).all(|(v, s)| v.abs() <= 1e-9 * s) {
+                    break;
+                }
             }
-            let mut top = -r0 / (r1 - r0);
-            let rt = residual(t, s, top, &mut base)?;
-            if rt.abs() > 1e-9 * (r0.abs() + r1.abs()) {
-                let mut g = |z: f64| residual(t, s, z, &mut base);
-                top = numeric::root_from_guess(&mut g, top)?;
+            let mut d = vec![0.0; total];
+            for i in 0..m {
+                for k in 0..orders[i] {
+                    d[offs[i] + k] = if k + 1 < orders[i] { s[offs[i] + k + 1] } else { tops[i] };
+                }
             }
-            let mut d: Vec<f64> = s[1..].to_vec();
-            d.push(top);
             Ok(d)
         };
+        let mut start: Vec<f64> = fixed.iter().map(|v| v.unwrap_or(0.0)).collect();
+
+        // randwaardeprobleem: de onbekende beginwaarden zoeken (Newton op de schietfout)
+        if !targets.is_empty() {
+            let unknown: Vec<usize> = (0..total).filter(|&i| fixed[i].is_none()).collect();
+            let mut mags: Vec<f64> = targets.iter().map(|t| t.2.abs()).collect();
+            let mut shoot = |s0: &[f64], mags: &mut Vec<f64>| -> Result<Vec<f64>, Error> {
+                let mut at: Vec<(f64, Vec<f64>)> = Vec::new();
+                let mut out = Vec::with_capacity(targets.len());
+                for (q, &(idx, p, v)) in targets.iter().enumerate() {
+                    if !at.iter().any(|(x, _)| *x == p) {
+                        let sol = numeric::dopri(&mut rhs, s0, a.value, p, 1, 1e-10)?;
+                        at.push((p, sol.last().cloned().unwrap_or_default()));
+                    }
+                    let y = at.iter().find(|(x, _)| *x == p).map(|(_, s)| s[idx]).unwrap_or(f64::NAN);
+                    mags[q] = mags[q].max(y.abs());
+                    out.push(y - v);
+                }
+                Ok(out)
+            };
+            let base_start = start.clone();
+            let with = |u: &[f64]| {
+                let mut s = base_start.clone();
+                for (j, &i) in unknown.iter().enumerate() {
+                    s[i] = u[j];
+                }
+                s
+            };
+            let n = unknown.len();
+            let mut u = vec![0.0; n];
+            let mut g = shoot(&with(&u), &mut mags)?;
+            let worst = |g: &[f64], mags: &[f64]| g.iter().zip(mags).map(|(e, m)| e.abs() / m.max(1e-300)).fold(0.0, f64::max);
+            let norm = |g: &[f64], mags: &[f64]| g.iter().zip(mags).map(|(e, m)| (e / m.max(1e-300)).powi(2)).sum::<f64>();
+            let mut done = worst(&g, &mags) <= 1e-9;
+            for _ in 0..40 {
+                if done {
+                    break;
+                }
+                let mut jac = vec![0.0; n * n];
+                for j in 0..n {
+                    let h = u[j].abs().max(1.0) * 1e-4;
+                    let mut up = u.clone();
+                    up[j] += h;
+                    let gp = shoot(&with(&up), &mut mags)?;
+                    for q in 0..n {
+                        jac[q * n + j] = (gp[q] - g[q]) / h;
+                    }
+                }
+                let delta = numeric::solve_dense(jac, n, g.iter().map(|v| -v).collect())
+                    .filter(|d| d.iter().all(|x| x.is_finite()))
+                    .ok_or_else(|| dom("odesolve: de randvoorwaarden leggen de oplossing niet vast"))?;
+                // gedempte stap: halveren tot de fout kleiner wordt
+                let mut lambda = 1.0;
+                loop {
+                    let un: Vec<f64> = u.iter().zip(&delta).map(|(x, d)| x + lambda * d).collect();
+                    match shoot(&with(&un), &mut mags) {
+                        Ok(gn) if norm(&gn, &mags) < norm(&g, &mags) || lambda < 1e-3 => {
+                            u = un;
+                            g = gn;
+                            break;
+                        }
+                        _ if lambda < 1e-3 => break,
+                        _ => lambda /= 2.0,
+                    }
+                }
+                done = worst(&g, &mags) <= 1e-9;
+            }
+            if !done {
+                return Err(dom("odesolve: de randvoorwaarden zijn niet te halen (geen oplossing gevonden)"));
+            }
+            start = with(&u);
+        }
+
         let steps = 1000;
-        let start: Vec<f64> = init.iter().map(|q| q.value).collect();
         let sol = numeric::dopri(&mut rhs, &start, a.value, b.value, steps, 1e-10)?;
         let ts: Vec<f64> = (0..=steps).map(|k| a.value + (b.value - a.value) * k as f64 / steps as f64).collect();
-        let ys: Vec<f64> = sol.iter().map(|s| s[0]).collect();
-        let ds: Vec<f64> = if n >= 2 {
-            sol.iter().map(|s| s[1]).collect()
+        // de afgeleide in de knooppunten: uit de toestand, of bij eerste orde uit de vergelijking
+        let firsts: Vec<Vec<f64>> = if orders.contains(&1) {
+            ts.iter().zip(&sol).map(|(t, s)| rhs(*t, s)).collect::<Result<_, Error>>()?
         } else {
-            ts.iter().zip(&sol).map(|(t, s)| Ok(rhs(*t, s)?[0])).collect::<Result<_, Error>>()?
+            Vec::new()
         };
-        let table = Table { ts, ys, ds, tdim, ydim };
-        Ok(UserFn {
-            params: vec![tvar.to_string()],
-            body: Expr::Interp(Arc::new(table), Box::new(Expr::Var(tvar.to_string()))),
-        })
+        Ok((0..m)
+            .map(|i| {
+                let o = offs[i];
+                let ys = sol.iter().map(|s| s[o]).collect();
+                let ds = if orders[i] >= 2 { sol.iter().map(|s| s[o + 1]).collect() } else { firsts.iter().map(|d| d[o]).collect() };
+                let table = Table { ts: ts.clone(), ys, ds, tdim, ydim: ydims[i] };
+                UserFn {
+                    params: vec![tvar.to_string()],
+                    body: Expr::Interp(Arc::new(table), Box::new(Expr::Var(tvar.to_string()))),
+                }
+            })
+            .collect())
     }
 
     // -----------------------------------------------------------------------------------------
@@ -540,41 +708,41 @@ impl Env {
     }
 }
 
-/// Zoek aanroepen y^(k)(...) en geef (k, argument is precies t).
-fn find_calls(e: &Expr, order: &dyn Fn(&str) -> Option<usize>, tvar: &str, out: &mut Vec<(usize, bool)>) {
+/// Zoek aanroepen y^(k)(...) van de functies en geef (welke functie, k, argument is precies t).
+fn find_calls(e: &Expr, which: &dyn Fn(&str) -> Option<(usize, usize)>, tvar: &str, out: &mut Vec<(usize, usize, bool)>) {
     match e {
         Expr::Call(n, args) => {
-            if let Some(k) = order(n) {
-                out.push((k, matches!(args.as_slice(), [Expr::Var(v)] if v == tvar)));
+            if let Some((i, k)) = which(n) {
+                out.push((i, k, matches!(args.as_slice(), [Expr::Var(v)] if v == tvar)));
             }
             for a in args {
-                find_calls(a, order, tvar, out);
+                find_calls(a, which, tvar, out);
             }
         }
-        Expr::Neg(x) | Expr::Not(x) => find_calls(x, order, tvar, out),
+        Expr::Neg(x) | Expr::Not(x) => find_calls(x, which, tvar, out),
         Expr::Bin(_, a, b) | Expr::And(a, b) | Expr::Or(a, b) => {
-            find_calls(a, order, tvar, out);
-            find_calls(b, order, tvar, out);
+            find_calls(a, which, tvar, out);
+            find_calls(b, which, tvar, out);
         }
-        Expr::Cmp(_, xs) => xs.iter().for_each(|x| find_calls(x, order, tvar, out)),
+        Expr::Cmp(_, xs) => xs.iter().for_each(|x| find_calls(x, which, tvar, out)),
         _ => {}
     }
 }
 
-/// Vervang y^(k)(t) door de interne variabele `__yk`.
-fn substitute(e: &Expr, order: &dyn Fn(&str) -> Option<usize>, tvar: &str) -> Expr {
-    let s = |x: &Expr| Box::new(substitute(x, order, tvar));
+/// Vervang y^(k)(t) van functie i door de interne variabele `__yi_k`.
+fn substitute(e: &Expr, which: &dyn Fn(&str) -> Option<(usize, usize)>, tvar: &str) -> Expr {
+    let s = |x: &Expr| Box::new(substitute(x, which, tvar));
     match e {
-        Expr::Call(n, args) => match (order(n), args.as_slice()) {
-            (Some(k), [Expr::Var(v)]) if v == tvar => Expr::Var(format!("__y{k}")),
-            _ => Expr::Call(n.clone(), args.iter().map(|a| substitute(a, order, tvar)).collect()),
+        Expr::Call(n, args) => match (which(n), args.as_slice()) {
+            (Some((i, k)), [Expr::Var(v)]) if v == tvar => Expr::Var(format!("__y{i}_{k}")),
+            _ => Expr::Call(n.clone(), args.iter().map(|a| substitute(a, which, tvar)).collect()),
         },
         Expr::Neg(x) => Expr::Neg(s(x)),
         Expr::Not(x) => Expr::Not(s(x)),
         Expr::Bin(op, a, b) => Expr::Bin(*op, s(a), s(b)),
         Expr::And(a, b) => Expr::And(s(a), s(b)),
         Expr::Or(a, b) => Expr::Or(s(a), s(b)),
-        Expr::Cmp(ops, xs) => Expr::Cmp(ops.clone(), xs.iter().map(|x| substitute(x, order, tvar)).collect()),
+        Expr::Cmp(ops, xs) => Expr::Cmp(ops.clone(), xs.iter().map(|x| substitute(x, which, tvar)).collect()),
         other => other.clone(),
     }
 }

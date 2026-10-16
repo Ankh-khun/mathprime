@@ -225,12 +225,12 @@ impl Sheet {
         }
         for &j in &self.graph.deps[i] {
             if matches!(self.cache[j].output, Output::Error { .. }) {
-                let name = self.graph.defines[j].clone().unwrap_or_default();
+                let line = self.regions[j].line;
                 return Cached::error(
-                    format!(
-                        "gebruikt '{name}' uit regel {}, en die bevat een fout",
-                        self.regions[j].line
-                    ),
+                    match &self.graph.defines[j] {
+                        Some(name) => format!("gebruikt '{name}' uit regel {line}, en die bevat een fout"),
+                        None => format!("gebruikt regel {line}, en die bevat een fout"),
+                    },
                     None,
                 );
             }
@@ -257,6 +257,11 @@ impl Sheet {
                 Ok(Outcome::Defined(d)) => Cached {
                     output: Output::None,
                     defined: vec![d],
+                    result: None,
+                },
+                Ok(Outcome::DefinedAll(defined)) => Cached {
+                    output: Output::None,
+                    defined,
                     result: None,
                 },
                 Ok(Outcome::Value { value, display, .. }) => match render_value(&value, &display) {
@@ -481,7 +486,7 @@ fn eval_sweep(env: &Env, spec: &SweepSpec) -> Result<Vec<String>, Error> {
             Ok(Outcome::Table { .. }) => {
                 "✗ een bereikvariabele in een sweep wordt niet ondersteund".to_string()
             }
-            Ok(Outcome::Defined(_)) => "✗ geen resultaatregel".to_string(),
+            Ok(Outcome::Defined(_) | Outcome::DefinedAll(_)) => "✗ geen resultaatregel".to_string(),
             Ok(Outcome::Symbolic { lhs_src, result }) => format!("{lhs_src} → {}", rb_core::symbolic::print(&result)),
             Err(e) => format!("✗ {e}"),
         };

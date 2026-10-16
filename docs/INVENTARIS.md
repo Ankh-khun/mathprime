@@ -42,7 +42,7 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 | Interpolatie | `linterp`, `lspline`/`pspline`/`cspline` + `interp` | v0.3 |
 | Regressie | `slope intercept line stderr polyfit linfit genfit` | v0.3 |
 | Oplossen | `root(f, x)`, `root(f, x, a, b)`, `polyroots`, `lsolve`, `Given` met `Find`/`Minerr`/`Minimize`/`Maximize` | v0.3 |
-| Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `odesolve` (één functie, willekeurige orde, beginwaardeprobleem) | v0.3 |
+| Differentiaalvergelijkingen | `rkfixed`, `Rkadapt`, `odesolve` (willekeurige orde; stelsels `[x; y] := odesolve([x; y], t, b)`; begin- en randwaardeproblemen) | v0.3, v1.6 |
 | Signaalverwerking | `fft ifft cfft icfft` (elke lengte; numpy-normering, zie `PLAN.md` §3) | v0.3 |
 | Werkblad | definities, functies, resultaten, tekst, koppen, sweeps, posities `@kolom,rij`, afhankelijkheidsgraaf, meerregelige blokken, solve blocks | v0.1, posities v0.2, blokken v0.3 |
 | Grafieken (2D) | `plot x = a ; b [; n] : f(x), g(x) [= eenheid]`, `plot vx : vy` (meetpunten), legenda, eenheden op de assen, interactief in de interface; logaritmische assen en vaste asgrenzen (`\| log xy, y = a ; b`) | v0.4, v1.4 |
@@ -56,7 +56,7 @@ Moeilijkheid: **S** uren, **M** dagen, **L** weken, **XL** maanden (relatief, af
 
 | categorie | voorbeelden | moeilijkheid | fase | bron |
 |---|---|---|---|---|
-| Differentiaalvergelijkingen (rest) | stelsels in `odesolve`, randwaardeproblemen (`sbval`, `bvalfit`), stijve oplossers (`Stiffb`, `Radau`), `Jacob` | M | 2+ | PTC-help (Jacob); overige eigen kennis |
+| Differentiaalvergelijkingen (rest) | `sbval`, `bvalfit` (randwaarden zonder Given-blok), stijve oplossers (`Stiffb`, `Radau`), `Jacob` | M | 2+ | PTC-help (Jacob); overige eigen kennis |
 | Speciale functies (rest) | Airy `Ai`, `Bi`, Bessel van niet-gehele orde, elliptische integralen | M | 2+ | PTC-help |
 | Data-analyse (rest) | `regress`, `loess`, lokaal minimum/maximum, uitschieters en NaN, PCA (`Nipals`), smoothing | L | 2+ | PTC-help |
 | Design of Experiments | ontwerpmatrices, factor screening, ANOVA, regressie, Monte Carlo | L | 2+ | PTC-help |

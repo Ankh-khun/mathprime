@@ -250,16 +250,22 @@ impl<'a> Parser<'a> {
                 }
                 let open = self.advance().start;
                 let mut args = self.parse_list(Tok::RParen, open, &format!("de argumenten van {name}"))?;
-                // odesolve(t, b): t is de onafhankelijke variabele
+                // odesolve(t, b): t is de onafhankelijke variabele; odesolve([x; y], t, b) voor een stelsel
                 if name == "odesolve" {
-                    return match (args.len(), args.first()) {
-                        (2, Some(Expr::Var(v))) => Ok(Expr::Bind {
+                    return match args.as_slice() {
+                        [Expr::Var(v), _] => Ok(Expr::Bind {
                             op: BindOp::OdeSolve,
                             body: Box::new(Expr::Num(0.0)),
                             var: v.clone(),
                             args: vec![args.remove(1)],
                         }),
-                        _ => Err(Error::parse(t.start, "schrijfwijze: y := odesolve(t, eindwaarde)")),
+                        [names, Expr::Var(v), _] if crate::ast::ode_names(names).is_some_and(|n| !n.is_empty()) => Ok(Expr::Bind {
+                            op: BindOp::OdeSolve,
+                            body: Box::new(names.clone()),
+                            var: v.clone(),
+                            args: vec![args.remove(2)],
+                        }),
+                        _ => Err(Error::parse(t.start, "schrijfwijze: y := odesolve(t, eindwaarde), of [x; y] := odesolve([x; y], t, eindwaarde)")),
                     };
                 }
                 if let Some((op, counts, syntax)) = binder(&name) {
@@ -675,6 +681,30 @@ pub fn parse_stmt(src: &str, allow_bare: bool) -> Result<Stmt, Error> {
     let toks = lex(src)?;
     if toks[0].tok == Tok::Eof {
         return Err(Error::parse(0, "lege invoer"));
+    }
+    // `[x; y] := odesolve([x; y], t, b)`: een stelsel differentiaalvergelijkingen
+    if toks[0].tok == Tok::LBracket {
+        if let Some(assign) = toks.iter().position(|t| t.tok == Tok::Assign) {
+            let mut p = Parser { toks: &toks, src, pos: 0 };
+            let lhs = p.parse_expr(0)?;
+            if p.pos == assign {
+                const SYSTEM: &str = "een vector links van := kan alleen bij een stelsel: [x; y] := odesolve([x; y], t, eindwaarde)";
+                let names = crate::ast::ode_names(&lhs).filter(|n| !n.is_empty()).ok_or_else(|| Error::parse(0, SYSTEM))?;
+                p.advance();
+                let body = p.parse_expr(0)?;
+                p.expect_eof()?;
+                return match &body {
+                    Expr::Bind { op: BindOp::OdeSolve, body: inner, .. } if crate::ast::ode_names(inner).as_ref() == Some(&names) => Ok(Stmt::Define {
+                        name: names[0].clone(),
+                        params: None,
+                        index: None,
+                        body,
+                        show: None,
+                    }),
+                    _ => Err(Error::parse(toks[assign].start, SYSTEM)),
+                };
+            }
+        }
     }
     if let Some((head, body_start)) = detect_define(&toks) {
         let mut p = Parser {

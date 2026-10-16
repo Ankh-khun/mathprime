@@ -253,6 +253,42 @@ fn odesolve_met_eenheden() {
 }
 
 #[test]
+fn odesolve_stelsel() {
+    // x' = y, y' = -x met x(0) = 1, y(0) = 0: x = cos t, y = -sin t
+    let src = "Given\nx'(t) == y(t)\ny'(t) == -x(t)\nx(0) == 1\ny(0) == 0\n[x; y] := odesolve([x; y], t, 4)\nx(π) =\ny(π/2) =\n";
+    let sheet = Sheet::load(src);
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "x(π) ="), "-1");
+    assert_eq!(value_of(&sheet, "y(π/2) ="), "-1");
+    // gemengde orde met eenheden: een massa-veer, aangedreven door een kracht die zelf uitdooft
+    let src = "k := 4 N/m\nmassa := 1 kg\nGiven\nmassa * u''(t) == -k * u(t) + F(t)\nF'(t) == -F(t) / (1 s)\nu(0 s) == 0 m\nu'(0 s) == 0 m/s\nF(0 s) == 2 N\n[u; F] := odesolve([u; F], t, 2 s)\nF(1 s) =\n";
+    let sheet = Sheet::load(src);
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "F(1 s)"), "735.759 mN");
+    // een vector links mag alleen bij odesolve
+    assert!(Sheet::load("[a; b] := [1; 2]\n").error_count() > 0);
+}
+
+#[test]
+fn odesolve_randwaardeprobleem() {
+    // ligger op twee steunpunten met gelijkmatige belasting: w'''' = q/EI,
+    // w = w'' = 0 aan beide einden; doorbuiging in het midden 5 q L^4 / (384 EI)
+    let src = "q := 10 kN/m\nEI := 20000 kN*m^2\nL := 6 m\nGiven\nw''''(x) == q / EI\nw(0 m) == 0 m\nw''(0 m) == 0\nw(L) == 0 m\nw''(L) == 0\nw := odesolve(x, L)\nw(L/2) = mm\n";
+    let sheet = Sheet::load(src);
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "w(L/2)"), "8.4375 mm");
+    // y'' = -y met y(0) = 0 en y(π/2) = 1: y = sin x
+    let sheet = Sheet::load("Given\ny''(x) + y(x) == 0\ny(0) == 0\ny(π/2) == 1\ny := odesolve(x, 3)\ny(π/6) =\n");
+    assert_eq!(sheet.error_count(), 0, "{}", sheet.render());
+    assert_eq!(value_of(&sheet, "y(π/6)"), "0.5");
+    // een voorwaarde buiten het bereik, en een ontbrekende voorwaarde
+    let sheet = Sheet::load("Given\ny''(x) + y(x) == 0\ny(0) == 0\ny(5) == 1\ny := odesolve(x, 3)\n");
+    assert!(sheet.render().contains("buiten het bereik"), "{}", sheet.render());
+    let sheet = Sheet::load("Given\ny''(x) + y(x) == 0\ny(0) == 0\ny := odesolve(x, 3)\n");
+    assert!(sheet.render().contains("y'(0) ontbreekt"), "{}", sheet.render());
+}
+
+#[test]
 fn diepe_recursie_in_een_blad() {
     let sheet = Sheet::load("som(n) := if(n == 0, 0, n + som(n - 1))\nsom(150) =\n");
     assert_eq!(sheet.output(1), &Output::Value("11325".into()));

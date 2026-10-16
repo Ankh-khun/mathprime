@@ -303,6 +303,10 @@ u''(t) + 2 ζ ω u'(t) + ω^2 u(t) == 0
 u(0 s) == 10 mm
 u'(0 s) == 0 m/s
 u := odesolve(t, 2 s)           een functie: u(1 s) = mm
+                                stelsel: x'(t) == y(t), y'(t) == -x(t), ... en dan
+                                [x; y] := odesolve([x; y], t, 10)
+                                randwaarden: w''''(x) == q/EI, w(0 m) == 0 m, w''(0 m) == 0,
+                                w(L) == 0 m, w''(L) == 0, w := odesolve(x, L)   (schietmethode)
 rkfixed([1; 0], 0, π, 100, D) = matrix met t en y; D(t, y) := [y[1]; -y[0]]  (ook Rkadapt)
 
 λ := eigenvals(M^-1 * K)        ook eigenvecs, svd, svds, qr, lu, cholesky, rank, cond2

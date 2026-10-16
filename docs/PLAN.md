@@ -262,10 +262,13 @@ afhankelijke regio's worden herberekend".
   stapsgewijs wordt opgevoerd; ze zijn nauwkeurig tot ongeveer 1e-8 relatief, genoeg voor de weergave met
   6 cijfers. `genfit(vx, vy, vg, F)` verwacht F(x, u) met u de parametervector (zoals Prime, zonder
   afgeleiden). Een Given-blok werkt in een werkblad, niet in de REPL.
-* **`odesolve`** lost één differentiaalvergelijking van willekeurige orde op (beginwaardeprobleem, alle
-  beginvoorwaarden in hetzelfde punt) en geeft een functie die tussen begin en eind wordt geïnterpoleerd
-  (1000 stappen, kubisch Hermite). Stelsels (`odesolve([x, y], t, b)`) en randwaardeproblemen nog niet;
-  daarvoor is er `rkfixed`/`Rkadapt` met een vectorfunctie D(t, y).
+* **`odesolve`** lost één differentiaalvergelijking of een stelsel (`[x; y] := odesolve([x; y], t, b)`,
+  zoals Prime) van willekeurige orde op en geeft per functie een functie die tussen begin en eind wordt
+  geïnterpoleerd (1000 stappen, kubisch Hermite). De hoogste afgeleiden worden met Newton uit de
+  vergelijkingen gehaald (lineair: één stap). Staan de voorwaarden in meer punten, dan is het een
+  randwaardeprobleem: begin in het punt het verst van b, zoek de ontbrekende beginwaarden met Newton op de
+  schietfout (gedempt). Een kale 0 als voorwaarde past bij elke eenheid. Stijve problemen kunnen falen
+  (expliciete Dormand–Prince); daar zijn nog geen `Stiffb`/`Radau`.
 * **FFT-normering als numpy, niet als Mathcad**: `fft(v)` is Σ v_j·e^(−2πi·jk/n) zonder factor en geeft
   het hele spectrum (n waarden, elke lengte); `ifft` deelt door n. Mathcads `fft` geeft alleen de helft
   van het spectrum voor 2^m reële waarden met een andere factor.
@@ -295,7 +298,7 @@ afhankelijke regio's worden herberekend".
   eenheid heeft (zoals M⁻¹·K in 1/s²); SVD, QR, Cholesky, `rank` en de normen vragen één eenheid voor de
   hele matrix. Eigenvectoren zijn dimensieloos en genormeerd op lengte 1.
 * **Nog niet:** symbolisch limieten, reeksen en integreren buiten veeltermen, Design of Experiments, financiële functies,
-  Airy-functies (`Ai`, `Bi`), Bessel van niet-gehele orde, stelsels in `odesolve`.
+  Airy-functies (`Ai`, `Bi`), Bessel van niet-gehele orde, stijve oplossers.
 * **Weergave rechtop, zoals Mathcad**: namen en eenheden staan niet cursief (Mathcad Prime toont ze
   rechtop); eenheden en resultaten krijgen wel een eigen kleur. Lettertypen: Ubuntu Light (de standaard
   van egui) met Hack als terugval voor ∈, ∧, ∨ en pijlen; interface, SVG en PDF gebruiken dezelfde

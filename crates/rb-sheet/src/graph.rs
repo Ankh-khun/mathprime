@@ -82,7 +82,7 @@ impl Graph {
         };
         // solve blocks: welke beperkingen horen bij welke afsluitende regio, en welke naam wordt
         // daar gedefinieerd (bij `y := odesolve(...)` mogen de beperkingen y, y', y'' gebruiken)
-        let mut exempt: Vec<Option<String>> = vec![None; n];
+        let mut exempt: Vec<Vec<String>> = vec![Vec::new(); n];
         let mut block: Option<Vec<usize>> = None;
         for (i, r) in regions.iter().enumerate() {
             match &r.kind {
@@ -97,8 +97,14 @@ impl Graph {
                         || matches!(stmt, rb_core::Stmt::Define { body: rb_core::Expr::Bind { op: rb_core::BindOp::OdeSolve, .. }, .. });
                     if closes {
                         let b = block.take().unwrap();
+                        // de functies van odesolve en de onafhankelijke variabele (t) zijn in de
+                        // vergelijkingen geen gewone namen
+                        let mut names = stmt.defines_all();
+                        if let rb_core::Stmt::Define { body: rb_core::Expr::Bind { op: rb_core::BindOp::OdeSolve, var, .. }, .. } = stmt {
+                            names.push(var.clone());
+                        }
                         for &j in &b {
-                            exempt[j] = stmt.defines().map(str::to_string);
+                            exempt[j] = names.clone();
                         }
                         g.constraints[i] = b;
                     }
@@ -122,6 +128,13 @@ impl Graph {
                         extends[i] = stmt.updates_existing();
                         all_defs.entry(name.to_string()).or_default().push(i);
                     }
+                    // een stelsel `[x; y] := odesolve(...)` definieert ook de andere functies
+                    if let Some(names) = stmt.ode_system() {
+                        for name in &names[1..] {
+                            all_defs.entry(name.clone()).or_default().push(i);
+                        }
+                        g.also_defines[i] = names[1..].to_vec();
+                    }
                 }
                 Kind::Table(t) => {
                     uses[i] = t.uses();
@@ -138,7 +151,7 @@ impl Graph {
                     uses[i] = e
                         .names()
                         .into_iter()
-                        .filter(|u| exempt[i].as_deref() != Some(u.trim_end_matches('\'')))
+                        .filter(|u| !exempt[i].iter().any(|e| e == u.trim_end_matches('\'')))
                         .collect()
                 }
                 _ => {}

@@ -371,7 +371,12 @@ impl Builder {
                     BindOp::Root | BindOp::OdeSolve => {
                         let name = if *op == BindOp::Root { "root" } else { "odesolve" };
                         out.extend(chars(name));
-                        let mut items = if *op == BindOp::Root { vec![(**body).clone(), Expr::Var(var.clone())] } else { vec![Expr::Var(var.clone())] };
+                        // root(f, x, ..); odesolve(t, b) of bij een stelsel odesolve([x; y], t, b)
+                        let mut items = if *op == BindOp::Root || matches!(**body, Expr::Matrix(_)) {
+                            vec![(**body).clone(), Expr::Var(var.clone())]
+                        } else {
+                            vec![Expr::Var(var.clone())]
+                        };
                         items.extend(args.iter().cloned());
                         out.push(Atom::Paren(self.list(&items)));
                     }
@@ -465,7 +470,11 @@ pub fn from_stmt(stmt: &Stmt) -> Block {
     let mut v = Vec::new();
     match stmt {
         Stmt::Define { name, params, index, body, show } => {
-            v.extend(chars(name));
+            // een stelsel: [x; y] := odesolve([x; y], t, b)
+            match stmt.ode_system() {
+                Some(names) => b.expr(&Expr::Matrix(names.into_iter().map(|n| vec![Expr::Var(n)]).collect()), &mut v),
+                None => v.extend(chars(name)),
+            }
             if let Some(p) = params {
                 let args: Vec<Expr> = p.iter().map(|n| Expr::Var(n.clone())).collect();
                 v.push(Atom::Paren(b.list(&args)));
