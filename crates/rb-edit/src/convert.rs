@@ -517,6 +517,22 @@ pub fn from_stmt(stmt: &Stmt) -> Block {
                     v.push(Atom::Op(Op::BoolEq));
                     b.expr(val, &mut v);
                 }
+                SymOp::Limit(x, a) | SymOp::Series(x, a, _) => {
+                    v.extend(chars(if matches!(op, SymOp::Limit(..)) { "limit" } else { "series" }));
+                    v.push(Atom::Op(Op::Comma));
+                    v.extend(chars(x));
+                    v.push(Atom::Op(Op::BoolEq));
+                    b.expr(a, &mut v);
+                    if let SymOp::Series(_, _, n) = op {
+                        v.push(Atom::Op(Op::Comma));
+                        v.extend(chars(&n.to_string()));
+                    }
+                }
+                SymOp::Float(n) => {
+                    v.extend(chars("float"));
+                    v.push(Atom::Op(Op::Comma));
+                    v.extend(chars(&n.to_string()));
+                }
             }
         }
     }

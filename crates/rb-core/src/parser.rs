@@ -68,6 +68,17 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Een klein geheel getal (1 tot en met 50), zoals de orde bij `series, x, 6`.
+    fn small_count(&mut self, what: &str) -> Result<usize, Error> {
+        match self.peek().tok {
+            Tok::Num(v) if v.fract() == 0.0 && (1.0..=50.0).contains(&v) => {
+                self.advance();
+                Ok(v as usize)
+            }
+            _ => Err(Error::parse(self.peek().start, format!("{what}: verwacht een geheel getal van 1 tot en met 50"))),
+        }
+    }
+
     fn unexpected(&self) -> Error {
         let t = self.peek();
         Error::parse(t.start, format!("onverwacht {}", self.text(t)))
@@ -814,10 +825,34 @@ pub fn parse_stmt(src: &str, allow_bare: bool) -> Result<Stmt, Error> {
                             p.advance();
                             crate::ast::SymOp::Substitute(x, p.parse_expr(0)?)
                         }
+                        "limit" | "lim" | "limiet" => {
+                            let x = var(&mut p)?;
+                            if !matches!(p.peek().tok, Tok::Eq | Tok::EqEq) {
+                                return Err(Error::parse(p.peek().start, "na 'limit, x' hoort '= punt', zoals 'limit, x = 0' of 'limit, x = ∞'"));
+                            }
+                            p.advance();
+                            crate::ast::SymOp::Limit(x, p.parse_expr(0)?)
+                        }
+                        // series, x [= a] [, n]
+                        "series" | "reeks" => {
+                            let x = var(&mut p)?;
+                            let a = if matches!(p.peek().tok, Tok::Eq | Tok::EqEq) {
+                                p.advance();
+                                p.parse_expr(0)?
+                            } else {
+                                Expr::Num(0.0)
+                            };
+                            let n = if p.peek().tok == Tok::Comma { p.advance(); p.small_count("de orde van de reeks")? } else { 6 };
+                            crate::ast::SymOp::Series(x, a, n)
+                        }
+                        "float" | "decimaal" => {
+                            let n = if p.peek().tok == Tok::Comma { p.advance(); p.small_count("het aantal cijfers")? } else { 15 };
+                            crate::ast::SymOp::Float(n.min(17))
+                        }
                         other => {
                             return Err(Error::parse(
                                 kw_start,
-                                format!("onbekend sleutelwoord '{other}' na →; gebruik simplify, expand, factor, solve, x of substitute, x = …"),
+                                format!("onbekend sleutelwoord '{other}' na →; gebruik simplify, expand, factor, solve, x, substitute, x = …, limit, x = a, series, x = a, n of float, n"),
                             ))
                         }
                     }

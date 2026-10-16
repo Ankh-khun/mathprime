@@ -91,7 +91,7 @@ impl Env {
         Some(match name {
             "linfit" => self.linfit(args, loc, depth),
             "genfit" => self.genfit(args, loc, depth),
-            "rkfixed" | "Rkadapt" => self.ode_fixed(name, args, loc, depth),
+            "rkfixed" | "Rkadapt" | "Radau" => self.ode_fixed(name, args, loc, depth),
             "Find" | "Minerr" => self.find(name, args, loc, depth),
             "Minimize" | "Maximize" => self.minimize(name, args, loc, depth),
             _ => return None,
@@ -214,10 +214,11 @@ impl Env {
         };
         let start: Vec<f64> = y0.iter().map(|q| q.value).collect();
         let n = n as usize;
-        let sol = if name == "rkfixed" {
-            numeric::rk4(&mut rhs, &start, x1.value, x2.value, n)?
-        } else {
-            numeric::dopri(&mut rhs, &start, x1.value, x2.value, n, 1e-10)?
+        let sol = match name {
+            "rkfixed" => numeric::rk4(&mut rhs, &start, x1.value, x2.value, n)?,
+            // stijve vergelijkingen: impliciet
+            "Radau" => numeric::radau(&mut rhs, &start, x1.value, x2.value, n, 1e-8)?,
+            _ => numeric::dopri(&mut rhs, &start, x1.value, x2.value, n, 1e-10)?,
         };
         let cols = 1 + start.len();
         let mut data = Vec::with_capacity((n + 1) * cols);

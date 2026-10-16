@@ -323,6 +323,12 @@ pub enum SymOp {
     Solve(String),
     /// `→ substitute, x = waarde`
     Substitute(String, Expr),
+    /// `→ limit, x = a` (a mag ∞ zijn)
+    Limit(String, Expr),
+    /// `→ series, x = a, n`: Taylorreeks rond a tot en met de macht n − 1 (zoals Mathcad)
+    Series(String, Expr, usize),
+    /// `→ float, n`: als decimaal getal met n cijfers
+    Float(usize),
 }
 
 impl SymOp {
@@ -335,6 +341,9 @@ impl SymOp {
             SymOp::Factor => "factor".into(),
             SymOp::Solve(x) => format!("solve, {x}"),
             SymOp::Substitute(x, v) => format!("substitute, {x} = {}", crate::symbolic::print(v)),
+            SymOp::Limit(x, a) => format!("limit, {x} = {}", crate::symbolic::print(a)),
+            SymOp::Series(x, a, n) => format!("series, {x} = {}, {n}", crate::symbolic::print(a)),
+            SymOp::Float(n) => format!("float, {n}"),
         }
     }
 }
@@ -407,11 +416,11 @@ impl Stmt {
             // symbolisch: de onbekende van solve/substitute is een symbool, geen gebruikte waarde
             Stmt::Symbolic { expr, op, .. } => {
                 let mut bound = BTreeSet::new();
-                if let SymOp::Solve(x) | SymOp::Substitute(x, _) = op {
+                if let SymOp::Solve(x) | SymOp::Substitute(x, _) | SymOp::Limit(x, _) | SymOp::Series(x, _, _) = op {
                     bound.insert(x.clone());
                 }
                 expr.collect_names(&bound, &mut out);
-                if let SymOp::Substitute(_, v) = op {
+                if let SymOp::Substitute(_, v) | SymOp::Limit(_, v) | SymOp::Series(_, v, _) = op {
                     v.collect_names(&BTreeSet::new(), &mut out);
                 }
             }

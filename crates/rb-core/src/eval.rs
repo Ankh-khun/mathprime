@@ -1261,10 +1261,49 @@ impl Env {
         }
     }
 
+    /// `→ float, n`: elk deel zonder onbekenden uitrekenen en op n significante cijfers afronden
+    /// (`sqrt(2) * x` → `1.41421 * x`).
+    fn float_fold(&self, e: &Expr, digits: usize) -> Expr {
+        let round = |v: f64| -> f64 {
+            if v == 0.0 || !v.is_finite() {
+                return v;
+            }
+            format!("{:.*e}", digits.saturating_sub(1), v).parse().unwrap_or(v)
+        };
+        // een onbekende: geen constante, functie, eenheid of bekende waarde
+        let free = e.names().into_iter().any(|n| {
+            constant_value(&n).is_none()
+                && !self.funcs.contains_key(&n)
+                && !crate::builtins::NAMES.contains(&n.as_str())
+                && lookup_unit(&n).is_none()
+                && !self.vars.contains_key(&n)
+        });
+        if !free {
+            if let Ok(Value::Num(q)) = self.eval_expr(e) {
+                if q.dim.is_none() {
+                    return Expr::Num(round(q.value));
+                }
+            }
+        }
+        let go = |x: &Expr| Box::new(self.float_fold(x, digits));
+        match e {
+            Expr::Num(v) => Expr::Num(round(*v)),
+            Expr::Neg(x) => Expr::Neg(go(x)),
+            Expr::Bin(op, a, b) => match (*op, go(a), go(b)) {
+                // het getal vooraan: x * 1.414 → 1.414 * x
+                (BinOp::Mul, a, b) if matches!(*b, Expr::Num(_)) && !matches!(*a, Expr::Num(_)) => Expr::Bin(BinOp::Mul, b, a),
+                (op, a, b) => Expr::Bin(op, a, b),
+            },
+            Expr::Call(f, args) => Expr::Call(f.clone(), args.iter().map(|a| self.float_fold(a, digits)).collect()),
+            Expr::Matrix(rows) => Expr::Matrix(rows.iter().map(|r| r.iter().map(|a| self.float_fold(a, digits)).collect()).collect()),
+            other => other.clone(),
+        }
+    }
+
     fn eval_symbolic(&self, expr: &Expr, op: &SymOp) -> Result<Expr, Error> {
         use crate::symbolic as sym;
         let keep: Vec<String> = match op {
-            SymOp::Solve(x) | SymOp::Substitute(x, _) => vec![x.clone()],
+            SymOp::Solve(x) | SymOp::Substitute(x, _) | SymOp::Limit(x, _) | SymOp::Series(x, _, _) => vec![x.clone()],
             _ => Vec::new(),
         };
         let e = self.symbolic_inline(expr, &keep, 0)?;
@@ -1283,9 +1322,12 @@ impl Env {
                 let v = self.symbolic_inline(v, &[], 0)?;
                 sym::simplify(&sym::substitute(&e, x, &v))
             }
+            SymOp::Limit(x, a) => sym::limit(&e, x, &self.symbolic_inline(a, &[], 0)?),
+            SymOp::Series(x, a, n) => sym::series(&e, x, &self.symbolic_inline(a, &[], 0)?, *n),
+            SymOp::Float(n) => sym::simplify(&e).map(|s| self.float_fold(&s, *n)),
         };
         let r = r.map_err(dom)?;
-        if matches!(op, SymOp::Evaluate | SymOp::Simplify | SymOp::Substitute(..) | SymOp::Solve(_)) {
+        if matches!(op, SymOp::Evaluate | SymOp::Simplify | SymOp::Substitute(..) | SymOp::Solve(_) | SymOp::Limit(..)) {
             if let Some(q) = self.fold_units(&r) {
                 return Ok(q);
             }

@@ -200,6 +200,9 @@ fn bestaande_regels_bewerken_en_terug() {
         "v := 3 m/s =",
         "y := odesolve(t, 10)",
         "[x; y] := odesolve([x; y], t, 4)",
+        "sin(x) / x → limit, x = 0",
+        "cos(x) → series, x = 0, 5",
+        "sqrt(2) → float, 4",
         "f(n) := {\n    s := 0\n    for k in 1..n\n        if mod(k, 2) == 0\n            continue\n        s := s + k\n    return s\n}",
     ];
     for l in lines {

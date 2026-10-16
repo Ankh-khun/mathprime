@@ -174,8 +174,34 @@ fn fold_call(f: &str, args: &[Expr]) -> Option<Expr> {
             [Expr::Num(v)] if *v >= 0.0 && v.sqrt().fract() == 0.0 => Some(Expr::Num(v.sqrt())),
             _ => None,
         },
+        // sin, cos en tan bij een veelvoud van π/2 (sin(π) = 0, cos(π) = −1)
+        "sin" | "cos" | "tan" => {
+            let k = half_pi_multiple(args.first()?)?;
+            let (s, c) = match k.rem_euclid(4) {
+                0 => (0.0, 1.0),
+                1 => (1.0, 0.0),
+                2 => (0.0, -1.0),
+                _ => (-1.0, 0.0),
+            };
+            match f {
+                "sin" => Some(Expr::Num(s)),
+                "cos" => Some(Expr::Num(c)),
+                _ if c != 0.0 => Some(Expr::Num(s / c)),
+                _ => None,
+            }
+        }
         _ => None,
     }
+}
+
+/// Is `e` (alleen getallen en π) een geheel veelvoud k van π/2? Geeft k.
+fn half_pi_multiple(e: &Expr) -> Option<i64> {
+    if !contains(e, "π") || e.names().iter().any(|n| n != "π") {
+        return None;
+    }
+    let v = constant(&to_poly(&substitute(e, "π", &Expr::Num(std::f64::consts::PI)), false).ok()?)?;
+    let k = v / std::f64::consts::FRAC_PI_2;
+    ((k - k.round()).abs() < 1e-9).then(|| k.round() as i64)
 }
 
 fn to_poly(e: &Expr, expand: bool) -> Result<Poly, String> {
@@ -444,15 +470,60 @@ pub fn diff(e: &Expr, x: &str) -> Result<Expr, String> {
     simplify(&d(e, x)?)
 }
 
-/// Een primitieve naar `x` (veeltermen en sin, cos, exp van x), of `None`.
+/// `u = a·x + c`: geeft a (een getal ≠ 0), anders `None`.
+fn linear_coef(u: &Expr, x: &str) -> Option<f64> {
+    match constant(&to_poly(&d(u, x).ok()?, true).ok()?)? {
+        a if a != 0.0 && a.is_finite() => Some(a),
+        _ => None,
+    }
+}
+
+/// Primitieve van één factor `f^p` met een lineair argument: sin, cos, tan, exp, sinh, cosh van
+/// `a·x + c`, en machten van `a·x + c` (met 1/(a·x + c) → ln).
+fn primitive_atom(fe: &Expr, p: f64, x: &str) -> Option<Expr> {
+    let over = |e: Expr, a: f64| Expr::Bin(BinOp::Div, b(e), n(a));
+    if let Expr::Call(f, args) = fe {
+        if p != 1.0 || args.len() != 1 {
+            return None;
+        }
+        let a = linear_coef(&args[0], x)?;
+        let call = |g: &str| Expr::Call(g.into(), args.clone());
+        let anti = match f.as_str() {
+            "sin" => Expr::Neg(b(call("cos"))),
+            "cos" => call("sin"),
+            "exp" => fe.clone(),
+            "tan" => Expr::Neg(b(Expr::Call("ln".into(), vec![call("cos")]))),
+            "sinh" => call("cosh"),
+            "cosh" => call("sinh"),
+            _ => return None,
+        };
+        return Some(over(anti, a));
+    }
+    let a = linear_coef(fe, x)?;
+    Some(if p == -1.0 {
+        over(Expr::Call("ln".into(), vec![fe.clone()]), a)
+    } else {
+        over(Expr::Bin(BinOp::Pow, b(fe.clone()), n(p + 1.0)), a * (p + 1.0))
+    })
+}
+
+/// Een primitieve naar `x`, of `None`: veeltermen, sin/cos/tan/exp/sinh/cosh en machten van een lineair
+/// argument (`sin(2 x + 1)`, `1/(3 x - 2)`, `sqrt(x + 4)`), en `x^n` maal sin, cos of exp (partieel).
 pub fn integrate(e: &Expr, x: &str) -> Option<Expr> {
+    integrate_depth(e, x, 0)
+}
+
+fn integrate_depth(e: &Expr, x: &str, depth: usize) -> Option<Expr> {
+    if depth > 12 {
+        return None;
+    }
     let p = to_poly(e, true).ok()?;
     let xkey = print(&Expr::Var(x.to_string()));
     let mut out: Poly = Vec::new();
     for t in p {
         let mut t = t;
         let n = t.mono.remove(&xkey).map_or(0.0, |(_, p)| p);
-        // de andere factoren mogen x niet bevatten, behalve één sin(x), cos(x) of exp(x) als enige
+        // de andere factoren mogen x niet bevatten, behalve één factor met een lineair argument
         let with_x: Vec<String> = t.mono.iter().filter(|(_, (e, _))| contains(e, x)).map(|(k, _)| k.clone()).collect();
         match (with_x.as_slice(), n) {
             ([], n) if n == -1.0 => out.extend(mul(vec![t], atom(Expr::Call("ln".into(), vec![Expr::Var(x.into())]), 1.0), true)),
@@ -463,24 +534,131 @@ pub fn integrate(e: &Expr, x: &str) -> Option<Expr> {
             }
             ([k], n) if n == 0.0 => {
                 let (fe, fp) = t.mono.remove(k)?;
-                if fp != 1.0 {
+                let anti = primitive_atom(&fe, fp, x)?;
+                out.extend(mul(vec![t], to_poly(&anti, true).ok()?, true));
+            }
+            // partieel: ∫ x^n f(u) dx = x^n F(u) − n ∫ x^(n−1) F(u) dx, voor f = sin, cos, exp
+            ([k], n) if n > 0.0 && n.fract() == 0.0 => {
+                let (fe, fp) = t.mono.remove(k)?;
+                if !matches!(&fe, Expr::Call(f, _) if matches!(f.as_str(), "sin" | "cos" | "exp")) {
                     return None;
                 }
-                let anti = match &fe {
-                    Expr::Call(f, a) if a.len() == 1 && matches!(&a[0], Expr::Var(v) if v == x) => match f.as_str() {
-                        "sin" => Expr::Neg(b(Expr::Call("cos".into(), a.clone()))),
-                        "cos" => Expr::Call("sin".into(), a.clone()),
-                        "exp" => fe.clone(),
-                        _ => return None,
-                    },
-                    _ => return None,
-                };
-                out.extend(mul(vec![t], to_poly(&anti, true).ok()?, true));
+                let big_f = primitive_atom(&fe, fp, x)?;
+                let xn = |p: f64| Expr::Bin(BinOp::Pow, b(Expr::Var(x.into())), self::n(p));
+                let rest = integrate_depth(&Expr::Bin(BinOp::Mul, b(xn(n - 1.0)), b(big_f.clone())), x, depth + 1)?;
+                let whole = Expr::Bin(
+                    BinOp::Sub,
+                    b(Expr::Bin(BinOp::Mul, b(xn(n)), b(big_f))),
+                    b(Expr::Bin(BinOp::Mul, self::n(n), b(rest))),
+                );
+                out.extend(mul(vec![t], to_poly(&whole, true).ok()?, true));
             }
             _ => return None,
         }
     }
     Some(from_poly(&collect(out)))
+}
+
+/// Is dit een eindig getal (na vereenvoudigen)?
+fn finite_value(e: &Expr) -> Option<f64> {
+    constant(&to_poly(e, false).ok()?).filter(|v| v.is_finite())
+}
+
+/// Als `e` een veelterm in `x` is (gehele machten ≥ 0): de graad en de coëfficiënt van de hoogste macht.
+fn leading(e: &Expr, x: &str) -> Option<(f64, Expr)> {
+    let p = to_poly(e, true).ok()?;
+    let xkey = print(&Expr::Var(x.to_string()));
+    let mut terms: Vec<(f64, Term)> = Vec::new();
+    for mut t in p {
+        let k = t.mono.remove(&xkey).map_or(0.0, |(_, k)| k);
+        if k < 0.0 || k.fract() != 0.0 || t.mono.values().any(|(e, _)| contains(e, x)) {
+            return None;
+        }
+        terms.push((k, t));
+    }
+    let top = terms.iter().map(|(k, _)| *k).fold(0.0, f64::max);
+    let lead: Poly = terms.into_iter().filter(|(k, _)| *k == top).map(|(_, t)| t).collect();
+    if lead.is_empty() {
+        return Some((0.0, Expr::Num(0.0)));
+    }
+    Some((top, from_poly(&collect(lead))))
+}
+
+fn is_infinity(e: &Expr) -> Option<f64> {
+    match e {
+        Expr::Var(v) if v == "∞" || v == "inf" => Some(1.0),
+        Expr::Neg(x) => is_infinity(x).map(|s| -s),
+        _ => None,
+    }
+}
+
+/// De limiet van `e` voor `x → a`. Eerst invullen; geeft dat 0/0, dan de regel van l'Hôpital (tot zes keer).
+/// Voor `x → ±∞`: met `x = 1/t` naar `t → 0`, en bij gebroken veeltermen de hoogste machten.
+pub fn limit(e: &Expr, x: &str, a: &Expr) -> Result<Expr, String> {
+    if let Some(sign) = is_infinity(a) {
+        // een (gebroken) veelterm: de hoogste machten bepalen de limiet
+        let (p, q) = match e {
+            Expr::Bin(BinOp::Div, p, q) => ((**p).clone(), (**q).clone()),
+            other => (other.clone(), Expr::Num(1.0)),
+        };
+        if let (Some((dp, lp)), Some((dq, lq))) = (leading(&p, x), leading(&q, x)) {
+            return if dp < dq {
+                Ok(Expr::Num(0.0))
+            } else if dp == dq {
+                simplify(&Expr::Bin(BinOp::Div, b(lp), b(lq)))
+            } else {
+                Err(format!("limit: oneindig voor {x} → {}∞", if sign < 0.0 { "-" } else { "" }))
+            };
+        }
+        let t = "\u{0}t";
+        let inv = Expr::Bin(BinOp::Div, n(sign), b(Expr::Var(t.into())));
+        return limit(&substitute(e, x, &inv), t, &Expr::Num(0.0)).map_err(|_| format!("limit: geen limiet gevonden voor {x} → ∞"));
+    }
+    let mut cur = e.clone();
+    for _ in 0..=6 {
+        let (num_e, den_e) = match &cur {
+            Expr::Bin(BinOp::Div, p, q) => ((**p).clone(), (**q).clone()),
+            other => match simplify(other)? {
+                Expr::Bin(BinOp::Div, p, q) => (*p, *q),
+                s => (s, Expr::Num(1.0)),
+            },
+        };
+        let at = |f: &Expr| simplify(&substitute(f, x, a)).ok();
+        let (nv, dv) = (at(&num_e), at(&den_e));
+        match (nv.as_ref().and_then(finite_value), dv.as_ref().and_then(finite_value)) {
+            // 0/0: l'Hôpital
+            (Some(p), Some(q)) if p == 0.0 && q == 0.0 => {
+                cur = Expr::Bin(BinOp::Div, b(diff(&num_e, x)?), b(diff(&den_e, x)?));
+                continue;
+            }
+            (Some(_), Some(q)) if q == 0.0 => return Err(format!("limit: oneindig of bestaat niet voor {x} → {}", print(a))),
+            _ => {}
+        }
+        // gewoon invullen
+        if let (Some(p), Some(q)) = (nv, dv) {
+            return simplify(&Expr::Bin(BinOp::Div, b(p), b(q)));
+        }
+        return Err(format!("limit: geen limiet gevonden voor {x} → {}", print(a)));
+    }
+    Err(format!("limit: geen limiet gevonden voor {x} → {} (na zes keer l'Hôpital)", print(a)))
+}
+
+/// Taylorreeks van `e` rond `x = a`, met de termen tot en met de macht `order − 1` (zoals Mathcad).
+pub fn series(e: &Expr, x: &str, a: &Expr, order: usize) -> Result<Expr, String> {
+    let mut deriv = e.clone();
+    let mut total = Expr::Num(0.0);
+    let mut fact = 1.0;
+    let dx = if finite_value(a) == Some(0.0) { Expr::Var(x.into()) } else { Expr::Bin(BinOp::Sub, b(Expr::Var(x.into())), b(a.clone())) };
+    for k in 0..order {
+        if k > 0 {
+            fact *= k as f64;
+            deriv = diff(&deriv, x)?;
+        }
+        let ck = limit(&deriv, x, a)?;
+        let term = Expr::Bin(BinOp::Mul, b(Expr::Bin(BinOp::Div, b(ck), n(fact))), b(Expr::Bin(BinOp::Pow, b(dx.clone()), n(k as f64))));
+        total = Expr::Bin(BinOp::Add, b(total), b(term));
+    }
+    simplify(&total)
 }
 
 /// Los `lhs == rhs` op naar `x`: exact voor graad 1 en 2 (ook met andere symbolen), anders door
@@ -825,6 +1003,25 @@ mod taal {
         assert_eq!(run("integral(t, t, 0, x) → simplify"), "integral(t, t, 0, x) → x^2 / 2");
         // een onbekend sleutelwoord geeft een duidelijke fout
         assert!(Env::new().run_line("x → vereenvoudigen").is_err());
+    }
+
+    #[test]
+    fn limieten_reeksen_integralen_float() {
+        // l'Hôpital
+        assert_eq!(run("sin(x) / x → limit, x = 0"), "sin(x) / x → 1");
+        assert_eq!(run("(x^2 - 1) / (x - 1) → limit, x = 1"), "(x^2 - 1) / (x - 1) → 2");
+        assert_eq!(run("(1 - cos(x)) / x^2 → limit, x = 0"), "(1 - cos(x)) / x^2 → 1 / 2");
+        // naar oneindig
+        assert_eq!(run("(3*x^2 + 1) / (x^2 + 5) → limit, x = ∞"), "(3*x^2 + 1) / (x^2 + 5) → 3");
+        // Taylor rond 0 tot en met x^4
+        assert_eq!(run("cos(x) → series, x, 5"), "cos(x) → x^4 / 24 - x^2 / 2 + 1");
+        assert_eq!(run("exp(x) → series, x = 0, 3"), "exp(x) → x^2 / 2 + x + 1");
+        // integralen met een lineair argument en partieel
+        assert_eq!(run("integral(sin(2*x), x, 0, π/2) →"), "integral(sin(2*x), x, 0, π/2) → 1");
+        assert_eq!(run("integral(x * exp(x), x, 0, 1) →"), "integral(x * exp(x), x, 0, 1) → 1");
+        assert_eq!(run("integral(1 / (2*x + 1), x, 0, 1) → float, 6"), "integral(1 / (2*x + 1), x, 0, 1) → 0.549306");
+        // float
+        assert_eq!(run("sqrt(2) * x → float, 4"), "sqrt(2) * x → 1.414 * x");
     }
 
     #[test]

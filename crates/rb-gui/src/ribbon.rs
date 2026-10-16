@@ -164,6 +164,9 @@ fn groups(tab: Tab) -> Vec<(&'static str, Vec<B>)> {
                     ("factor", "Ontbinden in factoren", Ins::Type("→factor")),
                     ("solve", "Oplossen naar een variabele; typ daarna de naam", Ins::Type("→solve,")),
                     ("substitute", "Invullen: typ daarna x = waarde", Ins::Type("→substitute,")),
+                    ("limit", "Limiet: typ daarna x = punt (ook ∞)", Ins::Type("→limit,")),
+                    ("series", "Taylorreeks: typ daarna x = punt, orde", Ins::Type("→series,")),
+                    ("float", "Als decimaal getal: typ daarna het aantal cijfers", Ins::Type("→float,")),
                 ],
             ),
         ],
@@ -368,7 +371,7 @@ fn look(label: &str) -> Option<(String, String)> {
         "∨ or" => Some(("∨".into(), "Of".into())),
         "¬ not" => Some(("¬".into(), "Niet".into())),
         "→" => sym("Symbolisch"),
-        "simplify" | "expand" | "factor" | "solve" | "substitute" => Some(("→".into(), label.to_string())),
+        "simplify" | "expand" | "factor" | "solve" | "substitute" | "limit" | "series" | "float" => Some(("→".into(), label.to_string())),
         _ => None,
     }
 }

@@ -384,6 +384,9 @@ Functies van één getal werken ook element voor element op een vector of matrix
 
 ## Licenties
 
+MathPrime zelf valt onder de MIT-licentie (`LICENSE`): gebruiken, aanpassen en verspreiden mag, met
+de copyrightregel erbij. Meehelpen: zie `CONTRIBUTING.md`.
+
 De pictogrammen in de interface zijn [Tabler Icons](https://tabler.io/icons) (outline, versie 3.31.0),
 MIT-licentie, © Paweł Kuna; het lettertype staat in `crates/rb-gui/assets/tabler-icons-outline.ttf`
 met de licentie ernaast (`tabler-icons-LICENSE.txt`).

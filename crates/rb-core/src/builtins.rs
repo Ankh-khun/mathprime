@@ -972,7 +972,7 @@ pub const NAMES: &[&str] = &[
     "linterp", "lspline", "pspline", "cspline", "interp", "slope", "intercept", "line", "stderr",
     "polyfit", "linfit", "genfit",
     // differentiaalvergelijkingen en oplossers
-    "rkfixed", "Rkadapt", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
+    "rkfixed", "Rkadapt", "Radau", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
     // tekst
     "concat", "strlen", "substr", "search", "str2num", "num2str", "str2vec", "vec2str", "IsString", "error",
     // bestanden (via het werkblad, zie rb-sheet/src/io.rs)

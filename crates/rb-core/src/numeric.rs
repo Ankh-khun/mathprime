@@ -659,10 +659,164 @@ pub fn dopri(f: &mut OdeFunc<'_>, y0: &[f64], x0: f64, x1: f64, n: usize, rtol: 
     Ok(out)
 }
 
+/// Eén stap Radau IIA (orde 5, impliciet, drie trappen) van `x` naar `x + h`, met vereenvoudigde
+/// Newton op het stelsel van de trappen. `None` als Newton niet convergeert.
+fn radau_step(f: &mut OdeFunc<'_>, x: f64, y: &[f64], h: f64, jac: &[f64]) -> Result<Option<Vec<f64>>, Error> {
+    let s6 = 6f64.sqrt();
+    let c = [(4.0 - s6) / 10.0, (4.0 + s6) / 10.0, 1.0];
+    let a = [
+        [(88.0 - 7.0 * s6) / 360.0, (296.0 - 169.0 * s6) / 1800.0, (-2.0 + 3.0 * s6) / 225.0],
+        [(296.0 + 169.0 * s6) / 1800.0, (88.0 + 7.0 * s6) / 360.0, (-2.0 - 3.0 * s6) / 225.0],
+        [(16.0 - s6) / 36.0, (16.0 + s6) / 36.0, 1.0 / 9.0],
+    ];
+    let n = y.len();
+    let m = 3 * n;
+    // I − h (A ⊗ J)
+    let mut mat = vec![0.0; m * m];
+    for i in 0..3 {
+        for j in 0..3 {
+            for p in 0..n {
+                for q in 0..n {
+                    let one = if i == j && p == q { 1.0 } else { 0.0 };
+                    mat[(i * n + p) * m + j * n + q] = one - h * a[i][j] * jac[p * n + q];
+                }
+            }
+        }
+    }
+    let mut z = vec![0.0; m];
+    for _ in 0..12 {
+        let mut fz = Vec::with_capacity(3);
+        for i in 0..3 {
+            let yi: Vec<f64> = (0..n).map(|p| y[p] + z[i * n + p]).collect();
+            fz.push(f(x + c[i] * h, &yi)?);
+        }
+        // G(Z) = Z − h (A ⊗ I) F(y + Z)
+        let g: Vec<f64> = (0..m)
+            .map(|k| {
+                let (i, p) = (k / n, k % n);
+                z[k] - h * (0..3).map(|j| a[i][j] * fz[j][p]).sum::<f64>()
+            })
+            .collect();
+        let Some(dz) = solve_dense(mat.clone(), m, g.iter().map(|v| -v).collect()) else { return Ok(None) };
+        if dz.iter().any(|v| !v.is_finite()) {
+            return Ok(None);
+        }
+        for (zk, d) in z.iter_mut().zip(&dz) {
+            *zk += d;
+        }
+        if dz.iter().enumerate().all(|(k, d)| d.abs() <= 1e-12 + 1e-10 * (y[k % n] + z[k]).abs()) {
+            // stijf nauwkeurig: de laatste trap is de nieuwe waarde
+            return Ok(Some((0..n).map(|p| y[p] + z[2 * n + p]).collect()));
+        }
+    }
+    Ok(None)
+}
+
+/// Jacobiaan df/dy in (x, y) met voorwaartse differenties.
+fn ode_jacobian(f: &mut OdeFunc<'_>, x: f64, y: &[f64]) -> Result<Vec<f64>, Error> {
+    let n = y.len();
+    let f0 = f(x, y)?;
+    let mut jac = vec![0.0; n * n];
+    for q in 0..n {
+        let d = 1e-7 * y[q].abs().max(1e-5);
+        let mut yq = y.to_vec();
+        yq[q] += d;
+        let fq = f(x, &yq)?;
+        for p in 0..n {
+            jac[p * n + q] = (fq[p] - f0[p]) / d;
+        }
+    }
+    Ok(jac)
+}
+
+/// Radau IIA (orde 5) met adaptieve stap (één stap tegen twee halve stappen), voor stijve
+/// differentiaalvergelijkingen; geeft de oplossing in `n + 1` gelijk verdeelde punten, zoals [`dopri`].
+pub fn radau(f: &mut OdeFunc<'_>, y0: &[f64], x0: f64, x1: f64, n: usize, rtol: f64) -> Result<Vec<Vec<f64>>, Error> {
+    let dim = y0.len();
+    let mut out = vec![y0.to_vec()];
+    let mut y = y0.to_vec();
+    let mut x = x0;
+    let span = x1 - x0;
+    let mut h = span / (n as f64 * 4.0);
+    let mut steps = 0usize;
+    for k in 1..=n {
+        let target = x0 + span * k as f64 / n as f64;
+        while (target - x) * span.signum() > 1e-14 * span.abs() {
+            steps += 1;
+            if steps > 200_000 {
+                return Err(Error::Domain("Radau: de differentiaalvergelijking vraagt te veel stappen".to_string()));
+            }
+            if (x + h - target) * span.signum() > 0.0 {
+                h = target - x;
+            }
+            let jac = ode_jacobian(f, x, &y)?;
+            let whole = radau_step(f, x, &y, h, &jac)?;
+            let half = match radau_step(f, x, &y, h / 2.0, &jac)? {
+                Some(mid) => {
+                    let jm = ode_jacobian(f, x + h / 2.0, &mid)?;
+                    radau_step(f, x + h / 2.0, &mid, h / 2.0, &jm)?
+                }
+                None => None,
+            };
+            let (Some(y1), Some(y2)) = (whole, half) else {
+                h /= 4.0;
+                if h.abs() < 1e-14 * span.abs() {
+                    return Err(Error::Domain("Radau: de stapgrootte wordt te klein".to_string()));
+                }
+                continue;
+            };
+            // één stap tegen twee halve: bij orde 5 is de fout van de halve stappen ≈ verschil / 31
+            let err = ((0..dim)
+                .map(|i| {
+                    let sc = rtol * y[i].abs().max(y2[i].abs()) + rtol * 1e-3;
+                    ((y1[i] - y2[i]) / 31.0 / sc).powi(2)
+                })
+                .sum::<f64>()
+                / dim.max(1) as f64)
+                .sqrt();
+            if err.is_finite() && err <= 1.0 {
+                x += h;
+                y = y2;
+            }
+            let fac = if !err.is_finite() {
+                0.2
+            } else if err == 0.0 {
+                4.0
+            } else {
+                (0.9 * err.powf(-1.0 / 6.0)).clamp(0.2, 4.0)
+            };
+            h *= fac;
+            if h.abs() < 1e-14 * span.abs() {
+                return Err(Error::Domain("Radau: de stapgrootte wordt te klein".to_string()));
+            }
+        }
+        x = target;
+        out.push(y.clone());
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::f64::consts::PI;
+
+    #[test]
+    fn radau_bij_een_stijve_vergelijking() {
+        // y' = -1000 (y - cos x): na een korte inloop volgt y vrijwel cos x
+        let mut f = |x: f64, y: &[f64]| -> Result<Vec<f64>, Error> { Ok(vec![-1000.0 * (y[0] - x.cos())]) };
+        let sol = radau(&mut f, &[0.0], 0.0, 1.0, 10, 1e-8).unwrap();
+        let exact = (1e6 * 1f64.cos() + 1e3 * 1f64.sin()) / (1e6 + 1.0);
+        assert!((sol[10][0] - exact).abs() < 1e-7, "{} tegen {exact}", sol[10][0]);
+        // niet-stijf: y' = -y geeft e^-x, ook met Radau
+        let mut g = |_: f64, y: &[f64]| -> Result<Vec<f64>, Error> { Ok(vec![-y[0]]) };
+        let sol = radau(&mut g, &[1.0], 0.0, 2.0, 4, 1e-8).unwrap();
+        assert!((sol[4][0] - (-2f64).exp()).abs() < 1e-7);
+        // van der Pol met μ = 1000 (klassiek stijf) loopt door zonder te ontploffen
+        let mut v = |_: f64, y: &[f64]| -> Result<Vec<f64>, Error> { Ok(vec![y[1], 1000.0 * ((1.0 - y[0] * y[0]) * y[1]) - y[0]]) };
+        let sol = radau(&mut v, &[2.0, 0.0], 0.0, 100.0, 5, 1e-6).unwrap();
+        assert!(sol.iter().all(|s| s[0].abs() <= 2.1));
+    }
 
     #[test]
     fn oplossers() {

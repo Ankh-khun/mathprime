@@ -298,6 +298,8 @@ pub fn statement(s: &Stmt, n: &Names) -> R {
                     id("substitute", Some("KEYWORD")),
                     apply("equal", &[id(x, Some("VARIABLE")), expr(v, n)?])
                 ),
+                // hoe Mathcad deze opslaat is niet nagegaan: als tekstregio met de bron
+                SymOp::Limit(..) | SymOp::Series(..) | SymOp::Float(_) => return Err(format!("→ {}", op.keyword())),
             };
             let command = if command.is_empty() { command } else { format!("<ml:command>{command}</ml:command>") };
             Ok(format!("<ml:symEval>{}{command}</ml:symEval>", expr(e, n)?))
