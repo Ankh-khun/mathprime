@@ -339,7 +339,36 @@ impl App {
                 self.commit(false);
                 self.cv.preview = !self.cv.preview;
             }
+            Action::Afdrukken => self.print(),
         }
+    }
+
+    /// Afdrukken: het blad als PDF (precies het afdrukvoorbeeld) naar een tijdelijk bestand, en dat met
+    /// het printwerkwoord van Windows naar de PDF-lezer, die het printvenster toont. Kent de lezer dat
+    /// werkwoord niet, dan gaat de PDF open om daar af te drukken.
+    fn print(&mut self) {
+        self.commit(false);
+        let stem = self.file_name().trim_end_matches(".rkn").to_string();
+        let path = std::env::temp_dir().join(format!("MathPrime-afdruk-{}.pdf", std::process::id()));
+        if let Err(e) = std::fs::write(&path, rb_export::export_pdf(&self.sheet, &stem, false)) {
+            self.status = format!("Afdrukken mislukt: {e}");
+            return;
+        }
+        let quoted = path.display().to_string().replace('\'', "''");
+        let mut cmd = std::process::Command::new("powershell.exe");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Command", &format!("Start-Process -FilePath '{quoted}' -Verb Print")]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // geen consolevenster
+        }
+        self.status = match cmd.status() {
+            Ok(s) if s.success() => "Naar de printer gestuurd (via de PDF-lezer)".to_string(),
+            _ => match std::process::Command::new("cmd").args(["/C", "start", "", &path.display().to_string()]).status() {
+                Ok(_) => "De PDF-lezer kan niet direct afdrukken; de PDF staat open om daar af te drukken".to_string(),
+                Err(e) => format!("Afdrukken mislukt: {e}"),
+            },
+        };
     }
 
     pub(crate) fn guarded(&mut self, ctx: &egui::Context, p: Pending) {
@@ -419,7 +448,7 @@ impl App {
                 Action::Welkomstblad => i::BOOK,
                 Action::Instellingen => i::SETTINGS,
                 Action::Zoeken | Action::Vervangen => i::SEARCH,
-                Action::Afdrukvoorbeeld => i::PDF,
+                Action::Afdrukvoorbeeld | Action::Afdrukken => i::PDF,
             };
             let mut b = egui::Button::new(format!("{icon}   {}", a.label()));
             if let Some(sc) = km.shortcut(a) {
@@ -440,7 +469,7 @@ impl App {
                     self.export_mcdx();
                 }
                 ui.separator();
-                for a in [Action::Afdrukvoorbeeld, Action::ExportPdf, Action::ExportSvg] {
+                for a in [Action::Afdrukken, Action::Afdrukvoorbeeld, Action::ExportPdf, Action::ExportSvg] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
                 ui.separator();
@@ -771,7 +800,10 @@ impl eframe::App for App {
                     let pages = self.page_count();
                     ui.label(RichText::new(format!("{}  Afdrukvoorbeeld", crate::icons::PDF)).strong());
                     ui.label(RichText::new(format!("{pages} {} · zo komt het in de PDF", if pages == 1 { "pagina" } else { "pagina's" })).weak());
-                    if ui.button(format!("{}  PDF maken…", crate::icons::PDF)).clicked() {
+                    if ui.button(format!("{}  Afdrukken…", crate::icons::PDF)).clicked() {
+                        self.run(ctx, Action::Afdrukken);
+                    }
+                    if ui.button("PDF maken…").clicked() {
                         self.run(ctx, Action::ExportPdf);
                     }
                     if ui.button("Terug naar bewerken (Esc)").clicked() {
