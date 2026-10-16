@@ -911,7 +911,7 @@ pub fn call(name: &str, a: &[Value], origin: i64) -> Option<Result<Value, Error>
     if let Some(r) = call_value(name, a, origin) {
         return Some(r);
     }
-    if let Some(r) = crate::fit::call(name, a) {
+    if let Some(r) = crate::fit::call(name, a, origin) {
         return Some(r);
     }
     if a.len() == 1 && ELEMENTWISE.contains(&name) {
@@ -970,7 +970,7 @@ pub const NAMES: &[&str] = &[
     "polyroots", "fft", "ifft", "cfft", "icfft",
     // interpolatie en regressie
     "linterp", "lspline", "pspline", "cspline", "interp", "slope", "intercept", "line", "stderr",
-    "polyfit", "linfit", "genfit",
+    "polyfit", "linfit", "genfit", "regress", "loess", "ksmooth", "medsmooth", "localmax", "localmin", "filterNaN",
     // differentiaalvergelijkingen en oplossers
     "rkfixed", "Rkadapt", "Radau", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
     // tekst
