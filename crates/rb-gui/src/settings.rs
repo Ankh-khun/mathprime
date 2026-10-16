@@ -47,6 +47,8 @@ pub struct Settings {
     pub digits: usize,
     /// Zoom bij het starten (1.5 = 100%).
     pub start_zoom: f32,
+    /// Eens per dag kijken of er een nieuwere versie is (update.rs).
+    pub updates: bool,
 }
 
 impl Default for Settings {
@@ -58,6 +60,7 @@ impl Default for Settings {
             autocomplete: true,
             digits: 6,
             start_zoom: 1.5,
+            updates: true,
         }
     }
 }
@@ -79,6 +82,7 @@ impl Settings {
                 "start" => s.start_welcome = v == "welkom",
                 "aanvullen" => s.autocomplete = v != "uit",
                 "cijfers" => s.digits = v.parse::<usize>().map_or(6, |n| n.clamp(2, 15)),
+                "updates" => s.updates = v != "uit",
                 "zoom" => s.start_zoom = v.parse::<f32>().map_or(1.5, |z| z.clamp(0.6, 5.0)),
                 _ => {}
             }
@@ -88,13 +92,14 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\n",
+            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\n",
             self.thema.key(),
             self.background.key(),
             if self.start_welcome { "welkom" } else { "leeg" },
             if self.autocomplete { "aan" } else { "uit" },
             self.digits,
-            self.start_zoom
+            self.start_zoom,
+            if self.updates { "aan" } else { "uit" }
         )
     }
 }
@@ -228,6 +233,14 @@ impl App {
                 ui.checkbox(&mut s.autocomplete, "lijst met namen tijdens het typen");
                 ui.end_row();
             });
+
+            section(ui, crate::icons::REFRESH, "Updates");
+            egui::Grid::new("inst-updates").num_columns(2).spacing([12.0, 10.0]).show(ui, |ui| {
+                row_label(ui, "Nieuwe versies");
+                ui.checkbox(&mut s.updates, "eens per dag kijken op GitHub")
+                    .on_hover_text("Vraagt alleen het nummer van de nieuwste versie op; er gaat niets van jou mee");
+                ui.end_row();
+            });
             ui.add_space(10.0);
             ui.label(RichText::new("Wijzigingen werken meteen. Sneltoetsen staan in keymap.txt (Help → Sneltoetsen).").small().weak());
         });
@@ -251,7 +264,7 @@ mod tests {
 
     #[test]
     fn lezen_en_schrijven() {
-        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25 };
+        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false };
         assert_eq!(Settings::parse(&s.to_text()), s);
         // een oud bestand: alleen thema en achtergrond, de rest standaard
         let old = Settings::parse("# Instellingen van MathPrime\nachtergrond = ruitjes\nthema = donker\n");

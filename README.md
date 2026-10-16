@@ -4,7 +4,7 @@ Een rekenblad in Rust waarin je formules gewoon opschrijft en dat direct doorrek
 die meedenken. Geïnspireerd op Mathcad Prime; eigen naam, eigen bestandsformaat, geen code of
 assets van PTC.
 
-Status: **v1.4 — afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
+Status: **v1.5 — melding bij een nieuwe versie, automatische tests en releases via GitHub Actions; v1.4: afdrukvoorbeeld (Ctrl+Alt+P), logaritmische assen en vaste asgrenzen in grafieken (Bodediagrammen); v1.3: één venster voor alles, automatisch bewaren met herstellen na een crash, zoeken, vervangen en hernoemen (Ctrl+F, Ctrl+H); v1.2: een nieuw uiterlijk: lint met pictogrammen zoals Mathcad Prime, echte tabbladen, een rustige statusbalk, recente bestanden op een leeg blad; v1.1: tabbladen (Ctrl+Tab), een instellingenvenster, leeg starten en verbeteringen in de bediening; v1.0: automatisch aanvullen, tabellen (Ctrl+6), inklapbare gebieden, pagina-einden en kop- en voetteksten; v0.9: symbolisch rekenen met de pijl (→) en Excel/CSV lezen en schrijven; v0.8: opslaan als Mathcad (.mcdx), tekst als waarde en een controle tegen Mathcad zelf; v0.7: formulebibliotheek en formules omwerken naar de onbekende; v0.6: Mathcad Prime-bestanden (.mcdx) openen, met afbeeldingen; v0.5: werken zoals in Mathcad Prime, met lichte en donkere modus: typen op het werkblad met de toetsen van Prime,
 regio's op een pagina met raster, en een lint met alle rekenopties. Daaronder v0.4: grafische interface met opgemaakte formules, grafieken en export naar PDF
 en SVG, bovenop fase 2 (programmablokken, lineaire algebra, verdelingen, regressie, solve blocks,
 differentiaalvergelijkingen, FFT), fase 1 (logica, bereiken, matrices, calculus, complexe getallen,
@@ -54,6 +54,21 @@ erop om te installeren, zonder beheerdersrechten en alleen voor jezelf:
 
 Een nieuwe versie installeer je door het nieuwe pakket te starten; het overschrijft de oude. Sluit
 MathPrime eerst. Zonder vensters: `MathPrime-<versie>-setup.exe /Q` (de installatie meldt dan niets).
+
+MathPrime kijkt eens per dag op GitHub of er een nieuwere versie is (alleen het versienummer, met
+`curl.exe` uit Windows); is die er, dan staat rechtsonder "Versie … is uit", met een klik naar de
+downloadpagina. Uit te zetten in Instellingen → Updates. Zolang de repository privé is, krijgt
+MathPrime geen antwoord en meldt het niets.
+
+### Releases (GitHub Actions)
+
+Elke push naar `main` draait de tests op Windows (`.github/workflows/ci.yml`). Een versietag maakt een
+release met het installatiepakket en een zip (`release.yml`); de tag moet gelijk zijn aan de versie in
+`Cargo.toml`, de notities komen uit `docs/releases/<tag>.md`:
+
+```powershell
+git tag v1.5.0; git push origin v1.5.0
+```
 
 ## De grafische versie
 

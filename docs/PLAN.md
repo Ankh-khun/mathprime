@@ -24,7 +24,14 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.4)
+## 2. Wat er nu staat (v1.5)
+
+**Nieuw in v1.5.** GitHub Actions: `ci.yml` (tests en een release-build met `-D warnings` op windows-latest, bij
+elke push naar main en elk pull request) en `release.yml` (bij een tag `v*`: versie tegen `Cargo.toml`, tests,
+installatiepakket met IExpress als dat op de runner staat, altijd een zip, `gh release create` met de notities uit
+`docs/releases/<tag>.md`). Updatemelding (`rb-gui/src/update.rs`): eens per dag (`update.txt`) op de achtergrond
+`curl.exe` naar `releases/latest`; `tag_name` en `html_url` uit de JSON, alleen een hogere versie geeft de melding
+rechtsonder. Geen verbinding of een privé-repository (404): niets. Uit te zetten (`updates = uit`).
 
 **Nieuw in v1.4.** Afdrukvoorbeeld (Ctrl+Alt+P, `cv.preview` in `canvas.rs`): de layout met
 `Setup { static_plots: true }`, dezelfde als voor de PDF; de layoutcache houdt rekening met de stand; bewerken,

@@ -66,6 +66,9 @@ pub struct App {
     /// De zoekbalk (Ctrl+F); zie find.rs.
     pub(crate) find: Option<crate::find::FindState>,
     pub(crate) last_autosave: Instant,
+    /// Een nieuwere versie op GitHub (update.rs): eerst het antwoord van de achtergrondtaak, dan de melding.
+    update_rx: Option<std::sync::mpsc::Receiver<crate::update::Update>>,
+    update: Option<crate::update::Update>,
     /// Schermafdruk voor tests (MATHPRIME_SCREENSHOT).
     shot: Option<crate::shot::Shot>,
 }
@@ -112,11 +115,17 @@ impl App {
             recovery: None,
             find: None,
             last_autosave: Instant::now(),
+            update_rx: None,
+            update: None,
             shot: crate::shot::Shot::from_env(),
         };
         app.load_settings();
         app.load_recent();
         app.check_recovery();
+        if app.cv.set.updates && app.shot.is_none() {
+            let dir = app.keymap.path.as_ref().and_then(|p| p.parent()).map(|d| d.to_path_buf());
+            app.update_rx = crate::update::start(dir, cc.egui_ctx.clone());
+        }
         if let Some(i) = &app.inbox {
             i.set_ctx(&cc.egui_ctx);
         }
@@ -791,6 +800,10 @@ impl eframe::App for App {
                 }
                 ui.add_space(8.0);
                 ui.label(RichText::new(format!("{n} regio's  ·  {}", self.status)).weak());
+                if let Some(u) = self.update_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+                    self.update = Some(u);
+                    self.update_rx = None;
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let plain = |s: String| egui::Button::new(RichText::new(s).size(14.0)).frame_when_inactive(false);
                     if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text("Groter (Ctrl+wiel)").clicked() {
@@ -801,6 +814,14 @@ impl eframe::App for App {
                     }
                     if ui.add(plain(crate::icons::ZOOM_OUT.to_string())).on_hover_text("Kleiner (Ctrl+wiel)").clicked() {
                         self.run(ctx, Action::Kleiner);
+                    }
+                    if let Some(u) = &self.update {
+                        ui.add_space(12.0);
+                        let text = RichText::new(format!("{}  Versie {} is uit", crate::icons::REFRESH, u.version)).color(crate::icons::ACCENT);
+                        let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
+                        if r.on_hover_text("Naar de downloadpagina").clicked() {
+                            ctx.open_url(egui::OpenUrl::new_tab(&u.url));
+                        }
                     }
                 });
             });
