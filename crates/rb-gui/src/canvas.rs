@@ -1162,6 +1162,38 @@ impl App {
         }
     }
 
+    /// Hoeveel kolommen en rijen regio's verschuiven als ze van `start` naar `now` gesleept worden:
+    /// op het raster (ook over ingeklapte gebieden heen), en zoveel rijen lager als nodig om niet over
+    /// een andere regio te vallen.
+    fn drag_offset(&self, geo: &Geo, start: Pos2, now: Pos2, regions: &[usize]) -> (i64, i64) {
+        let (sx, sy) = geo.sheet(start);
+        let (ex, ey) = geo.sheet(now);
+        let (c0, r0) = geo.grid.cell(sx, sy);
+        let (c1, r1) = geo.grid.cell(ex, ey);
+        let dc = c1 as i64 - c0 as i64;
+        let mut dr = r1 as i64 - r0 as i64;
+        if dc == 0 && dr == 0 {
+            return (0, 0);
+        }
+        let boxes = |moving: bool| -> Vec<(f32, f32, f32, f32)> {
+            (0..self.sheet.regions().len()).filter(|j| regions.contains(j) == moving).filter_map(|j| self.region_box(j)).collect()
+        };
+        let (moving, others) = (boxes(true), boxes(false));
+        let col_w = geo.grid.col_w;
+        for _ in 0..400 {
+            let hit = moving.iter().any(|&(x, y, w, h)| {
+                let (x, y) = (x + dc as f32 * col_w, y + dr as f32 * ROW_H);
+                // een halve punt speling: tegen elkaar aan mag
+                others.iter().any(|&(ox, oy, ow, oh)| x + 0.5 < ox + ow && ox + 0.5 < x + w && y + 0.5 < oy + oh && oy + 0.5 < y + h)
+            });
+            if !hit {
+                break;
+            }
+            dr += 1;
+        }
+        (dc, dr)
+    }
+
     fn mouse(&mut self, ui: &egui::Ui, resp: &egui::Response, geo: &Geo) {
         // het afdrukvoorbeeld is alleen om te bekijken
         if self.cv.preview {
@@ -1199,19 +1231,25 @@ impl App {
             let end = latest.unwrap_or(Pos2::ZERO);
             match self.cv.drag.take() {
                 Some(Drag::Move { start, regions }) => {
-                    let (sx, sy) = geo.sheet(start);
-                    let (ex, ey) = geo.sheet(end);
-                    let dc = ((ex - sx) / geo.grid.col_w).round() as i64;
-                    let dr = ((ey - sy) / ROW_H).round() as i64;
+                    let (dc, dr) = self.drag_offset(geo, start, end, &regions);
                     if dc != 0 || dr != 0 {
+                        // waar de regio's terechtkomen, om ze daarna geselecteerd te houden
+                        let items = self.items();
+                        let target = move |it: &Item| ((it.col as i64 + dc).max(0) as usize, (it.row as i64 + dr).max(1) as usize);
+                        let targets: Vec<(usize, usize)> = regions.iter().filter_map(|&j| items.get(j)).map(target).collect();
                         self.rewrite(|items| {
                             for j in regions {
                                 if let Some(it) = items.get_mut(j) {
-                                    it.col = (it.col as i64 + dc).max(0) as usize;
-                                    it.row = (it.row as i64 + dr).max(1) as usize;
+                                    (it.col, it.row) = target(it);
                                 }
                             }
                         });
+                        self.cv.selected = (0..self.sheet.regions().len())
+                            .filter(|&k| {
+                                let p = self.sheet.regions()[k].pos;
+                                targets.contains(&(p.col, p.row))
+                            })
+                            .collect();
                     }
                 }
                 Some(Drag::Lasso { start }) => {
@@ -1300,7 +1338,9 @@ impl App {
             .collect();
         // verslepen: waar de regio's terechtkomen
         if let (Some(Drag::Move { start, regions }), Some(now)) = (&self.cv.drag, resp.interact_pointer_pos()) {
-            let d = now - *start;
+            // op het raster, zoals ze na het loslaten komen te staan
+            let (dc, dr) = self.drag_offset(geo, *start, now, regions);
+            let d = Vec2::new(dc as f32 * geo.grid.col_w, dr as f32 * ROW_H) * geo.zoom;
             for q in l.rects.iter().filter(|q| regions.contains(&q.region)) {
                 painter.rect_stroke(geo.rect(q).translate(d).expand(3.0), 2.0, Stroke::new(1.0, tone(BLUE)), StrokeKind::Middle);
             }
