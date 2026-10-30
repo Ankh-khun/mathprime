@@ -92,6 +92,7 @@ impl Env {
             "linfit" => self.linfit(args, loc, depth),
             "genfit" => self.genfit(args, loc, depth),
             "rkfixed" | "Rkadapt" | "Bulstoer" | "Radau" | "Stiffb" | "Stiffr" => self.ode_fixed(name, args, loc, depth),
+            "Jacob" => self.jacob(args, loc, depth),
             "sbval" => self.sbval(args, loc, depth),
             "bvalfit" => self.bvalfit(args, loc, depth),
             "Find" | "Minerr" => self.find(name, args, loc, depth),
@@ -293,6 +294,39 @@ impl Env {
             )));
         }
         Ok(p.iter().zip(&scales).map(|(a, s)| a * s).collect())
+    }
+
+    /// `Jacob(F, x)` of `Jacob(F(x), x)`: de Jacobiaan van de vectorfunctie F in het punt x; rij i, kolom j is
+    /// ∂F_i/∂x_j (centrale differenties), met eenheid F_i/x_j.
+    fn jacob(&self, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        Self::want("Jacob", args, 2)?;
+        let f = match &args[0] {
+            Expr::Call(n, _) if self.funcs.contains_key(n) => n.as_str(),
+            e => self.fn_arg(e, "Jacob")?,
+        };
+        let x0 = self.eval(&args[1], loc, depth)?;
+        let as_vector = matches!(x0, Value::Matrix(_));
+        let x = components(&x0, "het punt")?;
+        let at = |vals: &[f64]| -> Result<Vec<Quantity>, Error> {
+            let arg = Self::shaped(vals, &x, as_vector);
+            components(&self.call_user(f, vec![arg], depth)?, "F(x)")
+        };
+        let base: Vec<f64> = x.iter().map(|q| q.value).collect();
+        let f0 = at(&base)?;
+        let (rows, cols) = (f0.len(), x.len());
+        let mut data = vec![Quantity::scalar(0.0); rows * cols];
+        for j in 0..cols {
+            let h = 1e-6 * scale_of(base[j]);
+            let (mut up, mut down) = (base.clone(), base.clone());
+            up[j] += h;
+            down[j] -= h;
+            let (a, b) = (at(&up)?, at(&down)?);
+            for i in 0..rows {
+                let dim = f0[i].dim.checked_div(x[j].dim).ok_or(rb_units::UnitError::Overflow)?;
+                data[i * cols + j] = Quantity::new((a[i].value - b[i].value) / (2.0 * h), dim);
+            }
+        }
+        Ok(Value::Matrix(Matrix::new(rows, cols, data)))
     }
 
     /// `sbval(v, x1, x2, D, load, score)`: de ontbrekende beginwaarden v in x1, zodat score(x2, y(x2)) = 0.

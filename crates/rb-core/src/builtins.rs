@@ -321,6 +321,19 @@ fn call_special(name: &str, a: &[Quantity]) -> Option<Result<Quantity, Error>> {
             let (n, v) = (order(0)?, x(1)?);
             if name == "js" { s(sp::sph_j(n, v)?) } else { s(sp::sph_y(n, v)?) }
         }),
+        // elliptische integralen met de parameter m = k²
+        "ellipK" => arity(name, a, 1).and_then(|_| s(sp::ellip_k(x(0)?)?)),
+        "ellipF" => arity(name, a, 2).and_then(|_| s(sp::ellip_f(x(0)?, x(1)?)?)),
+        "ellipE" => match a.len() {
+            1 => x(0).and_then(|m| s(sp::ellip_e(m)?)),
+            2 => x(0).and_then(|phi| s(sp::ellip_e_inc(phi, x(1)?)?)),
+            n => Err(Error::Arity { name: name.to_string(), expected: "1 of 2".to_string(), got: n }),
+        },
+        "ellipPi" => match a.len() {
+            2 => x(0).and_then(|n| s(sp::ellip_pi(n, PI / 2.0, x(1)?)?)),
+            3 => x(0).and_then(|n| s(sp::ellip_pi(n, x(1)?, x(2)?)?)),
+            n => Err(Error::Arity { name: name.to_string(), expected: "2 of 3".to_string(), got: n }),
+        },
         "Beta" => arity(name, a, 2).and_then(|_| s(sp::beta(positive(name, "a", x(0)?)?, positive(name, "b", x(1)?)?))),
         // normale verdeling: dnorm(x, μ, σ), pnorm(x, μ, σ), qnorm(p, μ, σ)
         "dnorm" | "pnorm" => norm_args(0).and_then(|(mu, sigma, dim)| {
@@ -967,7 +980,7 @@ pub const NAMES: &[&str] = &[
     "Re", "Im", "arg", "conj",
     // speciale functies
     "erf", "erfc", "Γ", "gamma", "lnGamma", "Beta", "Ψ", "digamma",
-    "J0", "J1", "Jn", "Y0", "Y1", "Yn", "I0", "I1", "In", "K0", "K1", "Kn", "js", "ys", "Ai", "Bi",
+    "J0", "J1", "Jn", "Y0", "Y1", "Yn", "I0", "I1", "In", "K0", "K1", "Kn", "js", "ys", "Ai", "Bi", "ellipK", "ellipE", "ellipF", "ellipPi",
     // statistiek
     "sum", "prod", "mean", "median", "var", "Var", "stdev", "Stdev", "corr", "cvar", "percentile",
     "hist",
@@ -983,12 +996,12 @@ pub const NAMES: &[&str] = &[
     "polyroots", "fft", "ifft", "cfft", "icfft",
     // interpolatie en regressie
     "linterp", "lspline", "pspline", "cspline", "interp", "slope", "intercept", "line", "stderr",
-    "polyfit", "linfit", "genfit", "regress", "loess", "ksmooth", "medsmooth", "localmax", "localmin", "filterNaN",
+    "polyfit", "linfit", "genfit", "regress", "loess", "ksmooth", "medsmooth", "localmax", "localmin", "filterNaN", "supsmooth",
     // financieel (zie finance.rs)
     "pv", "fv", "pmt", "nper", "rate", "npv", "irr", "mirr", "cnper", "crate", "eff", "nom", "cumint",
     "cumprinc", "fvadj", "fvc",
     // differentiaalvergelijkingen en oplossers
-    "rkfixed", "Rkadapt", "Bulstoer", "Radau", "Stiffb", "Stiffr", "sbval", "bvalfit", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
+    "rkfixed", "Rkadapt", "Bulstoer", "Radau", "Stiffb", "Stiffr", "sbval", "bvalfit", "Jacob", "odesolve", "root", "Find", "Minerr", "Minimize", "Maximize",
     // tekst
     "concat", "strlen", "substr", "search", "str2num", "num2str", "str2vec", "vec2str", "IsString", "error",
     // bestanden (via het werkblad, zie rb-sheet/src/io.rs)

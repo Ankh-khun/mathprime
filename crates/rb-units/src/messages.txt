@@ -535,3 +535,11 @@ Shift+Spatie voegt een kolom toe in een matrix => Shift+Space adds a column in a
 deze regio heeft al := , = of → => this region already has := , = or →
 deze regio heeft al := of = => this region already has := or =
 dit teken heeft hier (nog) geen betekenis => this character has no meaning here (yet)
+de elliptische integraal bestaat alleen voor m < 1 => the elliptic integral only exists for m < 1
+de elliptische integraal bestaat alleen voor m ≤ 1 => the elliptic integral only exists for m ≤ 1
+de elliptische integraal bestaat alleen voor m·sin²φ < 1 => the elliptic integral only exists for m·sin²φ < 1
+de elliptische integraal bestaat alleen voor n·sin²φ < 1 en m·sin²φ < 1 => the elliptic integral only exists for n·sin²φ < 1 and m·sin²φ < 1
+de elliptische integraal van de derde soort vraagt |φ| ≤ π/2 => the elliptic integral of the third kind needs |φ| ≤ π/2
+1 of 2 => 1 or 2
+2 of 3 => 2 or 3
+het punt => the point

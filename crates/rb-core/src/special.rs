@@ -418,6 +418,153 @@ pub fn airy_bi(x: f64) -> Result<f64, Error> {
     }
 }
 // ---------------------------------------------------------------------------------------------
+// Elliptische integralen, met de parameter m = k² (zoals Abramowitz & Stegun), via de symmetrische
+// integralen van Carlson (duplicatie).
+
+fn rf(mut x: f64, mut y: f64, mut z: f64) -> f64 {
+    for _ in 0..100 {
+        let l = (x * y).sqrt() + (y * z).sqrt() + (z * x).sqrt();
+        (x, y, z) = (0.25 * (x + l), 0.25 * (y + l), 0.25 * (z + l));
+        let a = (x + y + z) / 3.0;
+        let (dx, dy, dz) = (1.0 - x / a, 1.0 - y / a, 1.0 - z / a);
+        if dx.abs().max(dy.abs()).max(dz.abs()) < 1e-3 {
+            let (e2, e3) = (dx * dy - dz * dz, dx * dy * dz);
+            return (1.0 + (e2 / 24.0 - 0.1 - 3.0 * e3 / 44.0) * e2 + e3 / 14.0) / a.sqrt();
+        }
+    }
+    f64::NAN
+}
+
+fn rd(mut x: f64, mut y: f64, mut z: f64) -> f64 {
+    let (mut sum, mut fac) = (0.0, 1.0);
+    for _ in 0..100 {
+        let l = (x * y).sqrt() + (y * z).sqrt() + (z * x).sqrt();
+        sum += fac / (z.sqrt() * (z + l));
+        fac *= 0.25;
+        (x, y, z) = (0.25 * (x + l), 0.25 * (y + l), 0.25 * (z + l));
+        let a = 0.2 * (x + y + 3.0 * z);
+        let (dx, dy, dz) = (1.0 - x / a, 1.0 - y / a, 1.0 - z / a);
+        if dx.abs().max(dy.abs()).max(dz.abs()) < 1e-3 {
+            let (ea, eb) = (dx * dy, dz * dz);
+            let (ec, ed) = (ea - eb, ea - 6.0 * eb);
+            let ee = ed + ec + ec;
+            return 3.0 * sum
+                + fac * (1.0 + ed * (-3.0 / 14.0 + 0.25 * 9.0 / 22.0 * ed - 4.5 / 26.0 * dz * ee)
+                    + dz * (ee / 6.0 + dz * (-9.0 / 22.0 * ec + 3.0 / 26.0 * dz * ea)))
+                    / (a * a.sqrt());
+        }
+    }
+    f64::NAN
+}
+
+fn rc(mut x: f64, mut y: f64) -> f64 {
+    for _ in 0..100 {
+        let l = 2.0 * (x * y).sqrt() + y;
+        (x, y) = (0.25 * (x + l), 0.25 * (y + l));
+        let a = (x + 2.0 * y) / 3.0;
+        let s = y / a - 1.0;
+        if s.abs() < 1e-3 {
+            return (1.0 + s * s * (0.3 + s * (1.0 / 7.0 + s * (3.0 / 8.0 + s * 9.0 / 22.0)))) / a.sqrt();
+        }
+    }
+    f64::NAN
+}
+
+fn rj(mut x: f64, mut y: f64, mut z: f64, mut p: f64) -> f64 {
+    let (mut sum, mut fac) = (0.0, 1.0);
+    for _ in 0..100 {
+        let l = (x * y).sqrt() + (y * z).sqrt() + (z * x).sqrt();
+        let al = (p * (x.sqrt() + y.sqrt() + z.sqrt()) + (x * y * z).sqrt()).powi(2);
+        let be = p * (p + l) * (p + l);
+        sum += fac * rc(al, be);
+        fac *= 0.25;
+        (x, y, z, p) = (0.25 * (x + l), 0.25 * (y + l), 0.25 * (z + l), 0.25 * (p + l));
+        let a = 0.2 * (x + y + z + 2.0 * p);
+        let (dx, dy, dz, dp) = (1.0 - x / a, 1.0 - y / a, 1.0 - z / a, 1.0 - p / a);
+        if dx.abs().max(dy.abs()).max(dz.abs()).max(dp.abs()) < 1e-3 {
+            let ea = dx * (dy + dz) + dy * dz;
+            let eb = dx * dy * dz;
+            let ec = dp * dp;
+            let ed = ea - 3.0 * ec;
+            let ee = eb + 2.0 * dp * (ea - ec);
+            return 3.0 * sum
+                + fac * (1.0 + ed * (-3.0 / 14.0 + 9.0 / 88.0 * ed - 9.0 / 52.0 * ee)
+                    + eb * (1.0 / 6.0 + dp * (-3.0 / 11.0 + dp * 3.0 / 26.0))
+                    + dp * ea * (1.0 / 3.0 - dp * 3.0 / 11.0)
+                    - 1.0 / 3.0 * dp * ec)
+                    / (a * a.sqrt());
+        }
+    }
+    f64::NAN
+}
+
+fn check_m(m: f64) -> Result<(), Error> {
+    if m < 1.0 {
+        Ok(())
+    } else {
+        Err(dom("de elliptische integraal bestaat alleen voor m < 1"))
+    }
+}
+
+/// Volledige integraal van de eerste soort K(m).
+pub fn ellip_k(m: f64) -> Result<f64, Error> {
+    check_m(m)?;
+    Ok(rf(0.0, 1.0 - m, 1.0))
+}
+
+/// Onvolledige integraal van de eerste soort F(φ, m).
+pub fn ellip_f(phi: f64, m: f64) -> Result<f64, Error> {
+    let s = phi.sin();
+    if m * s * s >= 1.0 {
+        return Err(dom("de elliptische integraal bestaat alleen voor m·sin²φ < 1"));
+    }
+    // periodiek in φ: F(φ + kπ, m) = F(φ, m) + 2k·K(m)
+    let k = (phi / PI).round();
+    let r = phi - k * PI;
+    let (s, c) = r.sin_cos();
+    let f = s * rf(c * c, 1.0 - m * s * s, 1.0);
+    Ok(if k == 0.0 { f } else { f + 2.0 * k * ellip_k(m)? })
+}
+
+/// Volledige integraal van de tweede soort E(m), ook voor m = 1.
+pub fn ellip_e(m: f64) -> Result<f64, Error> {
+    if m > 1.0 {
+        return Err(dom("de elliptische integraal bestaat alleen voor m ≤ 1"));
+    }
+    if m == 1.0 {
+        return Ok(1.0);
+    }
+    Ok(rf(0.0, 1.0 - m, 1.0) - m / 3.0 * rd(0.0, 1.0 - m, 1.0))
+}
+
+/// Onvolledige integraal van de tweede soort E(φ, m).
+pub fn ellip_e_inc(phi: f64, m: f64) -> Result<f64, Error> {
+    let s0 = phi.sin();
+    if m * s0 * s0 > 1.0 {
+        return Err(dom("de elliptische integraal bestaat alleen voor m·sin²φ < 1"));
+    }
+    let k = (phi / PI).round();
+    let r = phi - k * PI;
+    let (s, c) = r.sin_cos();
+    let q = 1.0 - m * s * s;
+    let e = s * rf(c * c, q, 1.0) - m / 3.0 * s * s * s * rd(c * c, q, 1.0);
+    Ok(if k == 0.0 { e } else { e + 2.0 * k * ellip_e(m)? })
+}
+
+/// Integraal van de derde soort Π(n, φ, m) = ∫₀^φ dθ / ((1 − n sin²θ) √(1 − m sin²θ)).
+pub fn ellip_pi(n: f64, phi: f64, m: f64) -> Result<f64, Error> {
+    let (s, c) = phi.sin_cos();
+    if phi.abs() > PI / 2.0 + 1e-12 {
+        return Err(dom("de elliptische integraal van de derde soort vraagt |φ| ≤ π/2"));
+    }
+    if m * s * s >= 1.0 || n * s * s >= 1.0 {
+        return Err(dom("de elliptische integraal bestaat alleen voor n·sin²φ < 1 en m·sin²φ < 1"));
+    }
+    let q = 1.0 - m * s * s;
+    Ok(s * rf(c * c, q, 1.0) + n / 3.0 * s * s * s * rj(c * c, q, 1.0, 1.0 - n * s * s))
+}
+
+// ---------------------------------------------------------------------------------------------
 // Verdelingen (dichtheid d, verdelingsfunctie p, kwantiel q)
 
 pub fn pnorm(z: f64) -> f64 {
@@ -591,6 +738,30 @@ mod tests {
         assert!(close(airy_ai(-2.0).unwrap(), 0.227_407_428_201_528_1, 1e-9));
         assert!(close(airy_bi(-2.0).unwrap(), -0.412_302_587_956_398_2, 1e-9));
         assert!(close(airy_ai(1e-9).unwrap(), 0.355_028_053_6, 1e-8));
+    }
+
+    #[test]
+    fn elliptische_integralen() {
+        use std::f64::consts::FRAC_PI_2;
+        // Abramowitz & Stegun tabel 17.1
+        assert!(close(ellip_k(0.5).unwrap(), 1.854_074_677_301_372, 1e-12));
+        assert!(close(ellip_e(0.5).unwrap(), 1.350_643_881_047_675, 1e-12));
+        assert!(close(ellip_k(0.0).unwrap(), FRAC_PI_2, 1e-14));
+        assert!(close(ellip_e(1.0).unwrap(), 1.0, 1e-14));
+        assert!(ellip_k(1.0).is_err());
+        // tegen de definitie (numeriek geïntegreerd)
+        let num = |f: &dyn Fn(f64) -> f64, phi: f64| numeric::integrate(&mut |t| Ok(f(t)), 0.0, phi).unwrap();
+        for (phi, m) in [(0.3, 0.2), (1.2, 0.9), (1.0, -0.7), (FRAC_PI_2, 0.5)] {
+            let w = |t: f64| 1.0 - m * t.sin() * t.sin();
+            assert!(close(ellip_f(phi, m).unwrap(), num(&|t| 1.0 / w(t).sqrt(), phi), 1e-9), "F {phi} {m}");
+            assert!(close(ellip_e_inc(phi, m).unwrap(), num(&|t| w(t).sqrt(), phi), 1e-9), "E {phi} {m}");
+            for n in [0.4, -1.5] {
+                let v = num(&|t| 1.0 / ((1.0 - n * t.sin() * t.sin()) * w(t).sqrt()), phi);
+                assert!(close(ellip_pi(n, phi, m).unwrap(), v, 1e-9), "Π {n} {phi} {m}");
+            }
+        }
+        // voorbij π/2: periodiek
+        assert!(close(ellip_f(4.0, 0.3).unwrap(), num(&|t| 1.0 / (1.0 - 0.3 * t.sin() * t.sin()).sqrt(), 4.0), 1e-9));
     }
 
     #[test]

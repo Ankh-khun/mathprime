@@ -154,6 +154,60 @@ fn loess_at(x: &[f64], y: &[f64], span: f64, t: f64) -> Option<f64> {
     local_poly(x, y, &w, t, 2).or_else(|| local_poly(x, y, &w, t, 1))
 }
 
+/// Lopende lokale rechte over een fractie `span` van de punten, met per punt de kruisvalidatiefout
+/// |y − ŷ₋ᵢ| (de voorspelling zonder dat punt zelf).
+fn running_line(x: &[f64], y: &[f64], span: f64) -> (Vec<f64>, Vec<f64>) {
+    let n = x.len();
+    let half = (((span * n as f64) / 2.0).round() as usize).max(2);
+    let at = |sx: f64, sy: f64, sxx: f64, sxy: f64, m: f64| {
+        let d = m * sxx - sx * sx;
+        if d.abs() < 1e-300 {
+            sy / m
+        } else {
+            (sxx * sy - sx * sxy) / d
+        }
+    };
+    let mut fit = vec![0.0; n];
+    let mut cv = vec![0.0; n];
+    for i in 0..n {
+        let (mut sx, mut sy, mut sxx, mut sxy, mut m) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        for j in i.saturating_sub(half)..=(i + half).min(n - 1) {
+            let u = x[j] - x[i];
+            sx += u;
+            sy += y[j];
+            sxx += u * u;
+            sxy += u * y[j];
+            m += 1.0;
+        }
+        fit[i] = at(sx, sy, sxx, sxy, m);
+        // punt i zelf heeft u = 0 en telt dus alleen mee in sy en m
+        cv[i] = (y[i] - at(sx, sy - y[i], sxx, sxy, m - 1.0)).abs();
+    }
+    (fit, cv)
+}
+
+fn supsmooth(x: &[f64], y: &[f64]) -> Vec<f64> {
+    const SPANS: [f64; 3] = [0.05, 0.2, 0.5];
+    const MID: f64 = 0.2;
+    let n = x.len();
+    let runs: Vec<(Vec<f64>, Vec<f64>)> = SPANS.iter().map(|s| running_line(x, y, *s)).collect();
+    // de fouten zelf gladstrijken, dan per punt de beste span
+    let errs: Vec<Vec<f64>> = runs.iter().map(|(_, cv)| running_line(x, cv, MID).0).collect();
+    let best: Vec<f64> = (0..n)
+        .map(|i| SPANS[(0..3).min_by(|&a, &b| errs[a][i].total_cmp(&errs[b][i])).unwrap_or(1)])
+        .collect();
+    let spans = running_line(x, &best, MID).0;
+    // tussen de drie uitkomsten interpoleren op de gladgestreken span, en nog één keer licht gladstrijken
+    let mixed: Vec<f64> = (0..n)
+        .map(|i| {
+            let s = spans[i].clamp(SPANS[0], SPANS[2]);
+            let (a, b, t) = if s <= SPANS[1] { (0, 1, (s - SPANS[0]) / (SPANS[1] - SPANS[0])) } else { (1, 2, (s - SPANS[1]) / (SPANS[2] - SPANS[1])) };
+            runs[a].0[i] * (1.0 - t) + runs[b].0[i] * t
+        })
+        .collect();
+    running_line(x, &mixed, SPANS[0]).0
+}
+
 pub fn call(name: &str, a: &[Value], origin: i64) -> Option<Result<Value, Error>> {
     Some(match name {
         // regress(vx, vy, k): zoals Mathcad een vector [3; 3; k; c0; ..; ck] voor interp
@@ -200,6 +254,13 @@ pub fn call(name: &str, a: &[Value], origin: i64) -> Option<Result<Value, Error>
             Ok(column(&out, dy))
         })(),
         // medsmooth(vy, n): lopende mediaan over n (oneven) punten; de randen blijven staan
+        // supsmooth(vx, vy): de super smoother van Friedman (1984). Lokale rechte lijnen met drie spans;
+        // per punt de span met de kleinste kruisvalidatiefout, zelf weer gladgestreken.
+        "supsmooth" => (|| {
+            arity(name, a, 2)?;
+            let (x, _, y, dy) = xy(name, &a[0], &a[1], 6, true)?;
+            Ok(column(&supsmooth(&x, &y), dy))
+        })(),
         "medsmooth" => (|| {
             arity(name, a, 2)?;
             let (y, dy) = real_vector(name, &a[0])?;
@@ -348,6 +409,24 @@ mod tests {
             Value::Num(q) => q.value,
             o => panic!("{o:?}"),
         }
+    }
+
+    #[test]
+    fn supsmooth_volgt_de_kromme() {
+        let col = |r: Result<Value, Error>| match r.unwrap() {
+            Value::Matrix(m) => m.data.iter().map(|q| q.value).collect::<Vec<f64>>(),
+            o => panic!("{o:?}"),
+        };
+        // een rechte blijft een rechte; een sinus met ruis komt dicht bij de sinus
+        let x: Vec<f64> = (0..200).map(|i| i as f64 * 0.05).collect();
+        let line: Vec<f64> = x.iter().map(|t| 2.0 * t + 1.0).collect();
+        let s = col(call("supsmooth", &[v(&x), v(&line)], 0).unwrap());
+        assert!(s.iter().zip(&line).all(|(a, b)| (a - b).abs() < 1e-9));
+        let noisy: Vec<f64> = x.iter().enumerate().map(|(i, t)| t.sin() + 0.2 * ((i * 7919 % 101) as f64 / 50.0 - 1.0)).collect();
+        let s = col(call("supsmooth", &[v(&x), v(&noisy)], 0).unwrap());
+        let rms = |p: &[f64]| (p.iter().zip(&x).map(|(a, t)| (a - t.sin()).powi(2)).sum::<f64>() / 200.0).sqrt();
+        assert!(rms(&s) < 0.4 * rms(&noisy), "{} tegen {}", rms(&s), rms(&noisy));
+        assert!(call("supsmooth", &[v(&x[..3]), v(&line[..3])], 0).unwrap().is_err());
     }
 
     #[test]
