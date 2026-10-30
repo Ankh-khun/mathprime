@@ -97,6 +97,18 @@ impl<'a> Parser<'a> {
         loop {
             let tok = self.peek().tok.clone();
             match tok {
+                Tok::Field(name) => {
+                    if BP_POSTFIX < min_bp {
+                        break;
+                    }
+                    let at = self.advance().start;
+                    // IPE("IPE200").Iy is IPE("IPE200", "Iy")
+                    match &mut lhs {
+                        Expr::Call(_, args) if args.len() == 1 => args.push(Expr::Str(name)),
+                        _ => return Err(Error::parse(at, "'.naam' kan alleen na een tabelrij staan, zoals IPE(\"IPE200\").Iy")),
+                    }
+                    continue;
+                }
                 Tok::Bang => {
                     if BP_POSTFIX < min_bp {
                         break;

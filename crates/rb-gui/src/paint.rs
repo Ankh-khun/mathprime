@@ -162,11 +162,42 @@ fn surface(ui: &mut egui::Ui, id: usize, rect: Rect, s: &rb_sheet::Surface, x_la
     }
 }
 
+/// Een 3D-kromme: slepen draait, dubbelklik zet de blik terug.
+fn curve3d(ui: &mut egui::Ui, id: usize, rect: Rect, c: &rb_sheet::Curve3d) {
+    let key = egui::Id::new(("kromme3d", id));
+    let mut view = ui.data(|d| d.get_temp::<(f64, f64)>(key)).unwrap_or(rb_export::doc::SURFACE_VIEW);
+    let resp = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+    if resp.dragged() {
+        let d = resp.drag_delta();
+        view.0 -= d.x as f64 * 0.01;
+        view.1 = (view.1 + d.y as f64 * 0.01).clamp(0.05, 1.5);
+        ui.data_mut(|m| m.insert_temp(key, view));
+    }
+    if resp.double_clicked() {
+        view = rb_export::doc::SURFACE_VIEW;
+        ui.data_mut(|m| m.insert_temp(key, view));
+    }
+    let size = (10.0 * rect.width() / 430.0).clamp(11.0, 22.0);
+    let ops = rb_export::doc::curve3d_ops(c, rect.width(), rect.height(), size, view);
+    paint_ops(&ui.painter_at(rect), &ops, rect.min, 1.0, ui.visuals().dark_mode);
+    resp.on_hover_text(crate::taal::t("Sleep om te draaien; dubbelklik zet de blik terug"));
+}
+
 /// Een interactieve grafiek (zoomen, verschuiven, waarden aflezen) in `rect`.
 pub fn plot(ui: &mut egui::Ui, id: usize, rect: Rect, data: &PlotData) {
     use rb_export::doc::{axis_value, log_ticks};
     if let Some(s) = &data.surface {
         surface(ui, id, rect, s, &data.x_label);
+        return;
+    }
+    if let Some(c) = &data.curve3d {
+        curve3d(ui, id, rect, c);
+        return;
+    }
+    if data.field.is_some() {
+        let size = (10.0 * rect.width() / 430.0).clamp(11.0, 22.0);
+        let ops = rb_export::doc::plot_ops(data, rect.width(), rect.height(), size);
+        paint_ops(&ui.painter_at(rect), &ops, rect.min, 1.0, ui.visuals().dark_mode);
         return;
     }
     let (lx, ly) = (data.log_x, data.log_y);

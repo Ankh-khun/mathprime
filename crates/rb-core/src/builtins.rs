@@ -1006,6 +1006,8 @@ pub const NAMES: &[&str] = &[
     "concat", "strlen", "substr", "search", "str2num", "num2str", "str2vec", "vec2str", "IsString", "error",
     // bestanden (via het werkblad, zie rb-sheet/src/io.rs)
     "READCSV", "WRITECSV", "READEXCEL", "WRITEEXCEL", "READFILE", "WRITEFILE", "READPRN", "WRITEPRN",
+    // opzoektabellen (zie tables.rs)
+    "tabel", "table",
     // speciale vormen (in de evaluator)
     "if", "integral", "deriv", "Σ", "∑", "∏", "∫",
 ];

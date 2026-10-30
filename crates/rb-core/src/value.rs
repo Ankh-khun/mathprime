@@ -411,6 +411,8 @@ pub enum Value {
     Range(RangeVal),
     /// Tekst (`"abc"`), zoals een string in Mathcad.
     Str(String),
+    /// Een opzoektabel, of één rij daarvan (`tabel("IPE")`, `IPE("IPE200")`).
+    Table(std::sync::Arc<crate::tables::Table>),
 }
 
 impl From<Quantity> for Value {
@@ -449,6 +451,7 @@ impl Value {
             Value::Matrix(_) => "matrix",
             Value::Range(_) => "bereik",
             Value::Str(_) => "tekst",
+            Value::Table(_) => "tabel",
         }
     }
 
@@ -460,7 +463,7 @@ impl Value {
             Value::Matrix(m) => {
                 m.data.iter().any(|q| q.value.is_nan()) || m.im.as_ref().is_some_and(|im| im.iter().any(|v| v.is_nan()))
             }
-            Value::Range(_) | Value::Str(_) => false,
+            Value::Range(_) | Value::Str(_) | Value::Table(_) => false,
         }
     }
 
@@ -472,7 +475,7 @@ impl Value {
             Value::Matrix(m) => {
                 m.data.iter().all(|q| q.value.is_finite()) && m.im.as_ref().is_none_or(|im| im.iter().all(|v| v.is_finite()))
             }
-            Value::Range(_) | Value::Str(_) => true,
+            Value::Range(_) | Value::Str(_) | Value::Table(_) => true,
         }
     }
 
@@ -515,6 +518,10 @@ impl Value {
 // ---------------------------------------------------------------------------------------------
 // Rekenen
 
+pub(crate) fn table_err() -> Error {
+    Error::Domain("met een tabel kun je niet rekenen; kies een waarde, zoals IPE(\"IPE200\").Iy".to_string())
+}
+
 pub fn neg(v: &Value) -> Result<Value, Error> {
     Ok(match v {
         Value::Num(q) => Value::Num(q.neg()),
@@ -522,6 +529,7 @@ pub fn neg(v: &Value) -> Result<Value, Error> {
         Value::Matrix(m) => Value::Matrix(m.cmap(|z| Ok(z.neg()))?),
         Value::Range(_) => return Err(range_err()),
         Value::Str(_) => return Err(str_err()),
+        Value::Table(_) => return Err(table_err()),
     })
 }
 
@@ -533,6 +541,9 @@ pub fn str_err() -> Error {
 pub fn binop(op: BinOp, a: &Value, b: &Value) -> Result<Value, Error> {
     if matches!(a, Value::Range(_)) || matches!(b, Value::Range(_)) {
         return Err(range_err());
+    }
+    if matches!(a, Value::Table(_)) || matches!(b, Value::Table(_)) {
+        return Err(table_err());
     }
     if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
         return Err(str_err());

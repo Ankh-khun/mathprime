@@ -543,3 +543,25 @@ de elliptische integraal van de derde soort vraagt |φ| ≤ π/2 => the elliptic
 1 of 2 => 1 or 2
 2 of 3 => 2 or 3
 het punt => the point
+plot: de drie vectoren moeten evenveel elementen hebben => plot: the three vectors must have the same number of elements
+plot: een vectorveld vraagt twee bereiken: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field => plot: a vector field needs two ranges: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field
+plot: een vectorveld vraagt twee bereiken en twee componenten: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field => plot: a vector field needs two ranges and two components: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field
+plot: een 3D-kromme vraagt drie reeksen: plot t = a ; b : x(t), y(t), z(t) | 3d => plot: a 3D curve needs three series: plot t = a ; b : x(t), y(t), z(t) | 3d
+een x-vector => an x vector
+as => axis
+pijlen => arrows
+z-as => z-axis
+y-as => y-axis
+oppervlak {} × {} punten {} => surface {} × {} points {}
+3D-kromme, {} punten {} => 3D curve, {} points {}
+vectorveld {} × {} punten {} => vector field {} × {} points {}
+(tekening: mathprime-cli export of de grafische versie) => (drawing: mathprime-cli export or the graphical version)
+tabel {} heeft geen kolom '{}'; wel: {} => table {} has no column '{}'; it has: {}
+tabel {} heeft geen rij '{}'; bijvoorbeeld {} => table {} has no row '{}'; for example {}
+onbekende tabel '{}'; er zijn: {} => unknown table '{}'; there are: {}
+tabel {} ({} rijen): {} => table {} ({} rows): {}
+tabel => table
+een sleutel of kolomnaam moet tekst of een getal zijn, geen {} => a key or column name must be text or a number, not a {}
+'.naam' kan alleen na een tabelrij staan, zoals IPE("IPE200").Iy => '.name' can only follow a table row, such as IPE("IPE200").Iy
+1 tot 3 => 1 to 3
+met een tabel kun je niet rekenen; kies een waarde, zoals IPE("IPE200").Iy => you cannot calculate with a table; pick a value, such as IPE("IPE200").Iy

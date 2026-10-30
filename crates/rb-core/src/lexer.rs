@@ -6,6 +6,8 @@ pub enum Tok {
     /// Imaginair getal: `2i`, `0.5j`
     Imag(f64),
     Ident(String),
+    /// `.naam` na een haakje: `IPE("IPE200").Iy`
+    Field(String),
     /// Tekst: `"abc"`
     Str(String),
     Plus,
@@ -89,6 +91,22 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Error> {
         let (start, c) = chars[i];
         if c.is_whitespace() {
             i += 1;
+            continue;
+        }
+        // .naam na een haakje: een kolom van een tabelrij (de formule-editor zet er een spatie tussen)
+        let field_at = (i + 1..chars.len()).find(|&k| !chars[k].1.is_whitespace());
+        if c == '.' && field_at.is_some_and(|k| chars[k].1.is_alphabetic()) && out.last().is_some_and(|t: &Token| t.tok == Tok::RParen) {
+            let from = field_at.unwrap_or(i + 1);
+            let mut j = from;
+            while ch(j).is_some_and(|d| d.is_alphanumeric() || d == '_') {
+                j += 1;
+            }
+            out.push(Token {
+                tok: Tok::Field(chars[from..j].iter().map(|c| c.1).collect()),
+                start,
+                end: byte_at(j),
+            });
+            i = j;
             continue;
         }
         if c == '.' && ch(i + 1) == Some('.') {

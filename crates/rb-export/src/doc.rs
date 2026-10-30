@@ -5,7 +5,7 @@
 use crate::font::{fonts, FontId, FontMetrics};
 use crate::view::{region_view, Content, View};
 use rb_layout::{Item, LayoutOptions, MBox, Style};
-use rb_sheet::{Kind, PlotData, Sheet, Surface};
+use rb_sheet::{Curve3d, Field, Kind, PlotData, Sheet, Surface};
 use rb_units::format_number;
 
 /// Een kleur (RGB).
@@ -395,6 +395,12 @@ pub const SURFACE_VIEW: (f64, f64) = (-0.65, 0.55);
 
 /// Teken een grafiek in een kader van `w` × `h` (linksboven op 0, 0).
 pub fn plot_ops(p: &PlotData, w: f32, h: f32, size: f32) -> Vec<Op> {
+    if let Some(c) = &p.curve3d {
+        return curve3d_ops(c, w, h, size, SURFACE_VIEW);
+    }
+    if let Some(f) = &p.field {
+        return field_ops(f, &p.x_label, w, h, size);
+    }
     if let Some(s) = &p.surface {
         return surface_ops(s, &p.x_label, w, h, size, SURFACE_VIEW);
     }
@@ -664,6 +670,132 @@ pub fn surface_ops(s: &Surface, x_label: &str, w: f32, h: f32, size: f32, view: 
     ops.push(Op::Text { x: lx + 4.0, y: ly + small + 4.0, size: small, text: s.y_label.clone(), font: FontId::Main, color: BLACK });
     ops.push(Op::Text { x: ax1 + 4.0, y: ay1, size: small, text: format!("{} {}", format_number(zmax), s.z_label), font: FontId::Main, color: GREY });
     ops.push(Op::Text { x: ax0 + 4.0, y: ay0, size: small, text: format_number(zmin), font: FontId::Main, color: GREY });
+    ops
+}
+
+/// Een 3D-kromme: een draadkader en de lijn, van achter naar voor getekend; de kleur loopt mee met de parameter.
+pub fn curve3d_ops(c: &Curve3d, w: f32, h: f32, size: f32, view: (f64, f64)) -> Vec<Op> {
+    let small = 0.8 * size;
+    let mut ops = Vec::new();
+    let range = |v: &[f64]| {
+        let (a, b) = v.iter().filter(|x| x.is_finite()).fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), x| (a.min(*x), b.max(*x)));
+        if a.is_finite() && b > a {
+            (a, b)
+        } else if a.is_finite() {
+            (a - 1.0, a + 1.0)
+        } else {
+            (0.0, 1.0)
+        }
+    };
+    let ((xa, xb), (ya, yb), (za, zb)) = (range(&c.x), range(&c.y), range(&c.z));
+    let (az, el) = view;
+    let norm = |v: f64, a: f64, b: f64| 2.0 * (v - a) / (b - a) - 1.0;
+    let project = |x: f64, y: f64, z: f64| -> (f64, f64, f64) {
+        let (u, v, zz) = (norm(x, xa, xb), norm(y, ya, yb), 0.8 * norm(z, za, zb));
+        let (rx, ry) = (u * az.cos() - v * az.sin(), u * az.sin() + v * az.cos());
+        (rx, ry * el.sin() + zz * el.cos(), ry * el.cos() - zz * el.sin())
+    };
+    let (cx, cy) = (w as f64 / 2.0, (h as f64 - 14.0) / 2.0 + 4.0);
+    let scale = (w as f64 / 3.2).min((h as f64 - 14.0) / 3.1);
+    let screen = |p: (f64, f64, f64)| ((cx + p.0 * scale) as f32, (cy - p.1 * scale) as f32);
+    // de ribben van het kader
+    let corner = |k: usize| {
+        let x = if k & 1 == 0 { xa } else { xb };
+        let y = if k & 2 == 0 { ya } else { yb };
+        let z = if k & 4 == 0 { za } else { zb };
+        screen(project(x, y, z))
+    };
+    for (a, b) in [(0, 1), (1, 3), (3, 2), (2, 0), (4, 5), (5, 7), (7, 6), (6, 4), (0, 4), (1, 5), (2, 6), (3, 7)] {
+        let ((x1, y1), (x2, y2)) = (corner(a), corner(b));
+        ops.push(Op::Line { x1, y1, x2, y2, width: 0.5, color: LIGHT });
+    }
+    // de stukjes lijn, achterste eerst
+    let n = c.x.len();
+    let mut segs: Vec<(f64, f64, (f32, f32), (f32, f32))> = Vec::with_capacity(n);
+    for i in 1..n {
+        if ![c.x[i - 1], c.y[i - 1], c.z[i - 1], c.x[i], c.y[i], c.z[i]].iter().all(|v| v.is_finite()) {
+            continue;
+        }
+        let (p, q) = (project(c.x[i - 1], c.y[i - 1], c.z[i - 1]), project(c.x[i], c.y[i], c.z[i]));
+        segs.push(((p.2 + q.2) / 2.0, i as f64 / n as f64, screen(p), screen(q)));
+    }
+    segs.sort_by(|a, b| b.0.total_cmp(&a.0));
+    for (_, t, (x1, y1), (x2, y2)) in segs {
+        ops.push(Op::Line { x1, y1, x2, y2, width: 1.4, color: heat(t) });
+    }
+    // labels bij de assen
+    let at = |k: usize, label: &str, text: String, ops: &mut Vec<Op>| {
+        let (x, y) = corner(k);
+        let t = if label.is_empty() { text } else { format!("{label}: {text}") };
+        ops.push(Op::Text { x: x + 3.0, y: y + small, size: small, text: t, font: FontId::Main, color: GREY });
+    };
+    at(1, &c.labels[0], format_number(xb), &mut ops);
+    at(2, &c.labels[1], format_number(yb), &mut ops);
+    at(4, &c.labels[2], format_number(zb), &mut ops);
+    at(0, "", format_number(xa), &mut ops);
+    ops
+}
+
+/// Een vectorveld: pijlen op een rooster; de langste is één roosterstap, de kleur toont de grootte.
+pub fn field_ops(f: &Field, x_label: &str, w: f32, h: f32, size: f32) -> Vec<Op> {
+    let small = 0.8 * size;
+    let mut ops = Vec::new();
+    let (nx, ny) = (f.xs.len(), f.ys.len());
+    let (xa, xb, ya, yb) = (f.xs[0], f.xs[nx - 1], f.ys[0], f.ys[ny - 1]);
+    let (left, right, top, bottom) = (52.0, 16.0, 14.0, 30.0);
+    let (px, py, pw, ph) = (left, top, w - left - right, h - top - bottom);
+    // een halve stap marge, zodat de pijlen aan de rand binnen het kader blijven
+    let (dx, dy) = ((xb - xa) / (nx.max(2) - 1) as f64, (yb - ya) / (ny.max(2) - 1) as f64);
+    let (x0, x1, y0, y1) = (xa - dx / 2.0, xb + dx / 2.0, ya - dy / 2.0, yb + dy / 2.0);
+    let sx = |x: f64| px + ((x - x0) / (x1 - x0)) as f32 * pw;
+    let sy = |y: f64| py + ph - ((y - y0) / (y1 - y0)) as f32 * ph;
+    for t in nice_ticks(x0.min(x1), x0.max(x1), 6) {
+        ops.push(Op::Line { x1: sx(t), y1: py, x2: sx(t), y2: py + ph, width: 0.5, color: LIGHT });
+        let label = format_number(t);
+        let lw = fonts().width(&label, small, FontId::Main);
+        ops.push(Op::Text { x: sx(t) - lw / 2.0, y: py + ph + small + 3.0, size: small, text: label, font: FontId::Main, color: GREY });
+    }
+    for t in nice_ticks(y0.min(y1), y0.max(y1), 5) {
+        ops.push(Op::Line { x1: px, y1: sy(t), x2: px + pw, y2: sy(t), width: 0.5, color: LIGHT });
+        let label = format_number(t);
+        let lw = fonts().width(&label, small, FontId::Main);
+        ops.push(Op::Text { x: px - lw - 4.0, y: sy(t) + small * 0.35, size: small, text: label, font: FontId::Main, color: GREY });
+    }
+    ops.push(Op::Rect { x: px, y: py, w: pw, h: ph, width: 0.8, color: GREY });
+    let cell = (pw / nx as f32).min(ph / ny as f32);
+    // de pijl op scherm: u naar rechts, v omhoog, in dezelfde maat (de assen kunnen verschillen)
+    let lengths: Vec<f64> = f.u.iter().zip(&f.v).map(|(u, v)| u.hypot(*v)).collect();
+    let max = lengths.iter().copied().filter(|l| l.is_finite()).fold(0.0f64, f64::max);
+    if max > 0.0 {
+        for j in 0..ny {
+            for i in 0..nx {
+                let k = j * nx + i;
+                let l = lengths[k];
+                if !l.is_finite() || l == 0.0 {
+                    continue;
+                }
+                let s = 0.9 * cell / max as f32;
+                let (ax, ay) = (f.u[k] as f32 * s, -(f.v[k] as f32) * s);
+                let (mx, my) = (sx(f.xs[i]), sy(f.ys[j]));
+                let (x1, y1, x2, y2) = (mx - ax / 2.0, my - ay / 2.0, mx + ax / 2.0, my + ay / 2.0);
+                let color = heat(l / max);
+                ops.push(Op::Line { x1, y1, x2, y2, width: 1.1, color });
+                let len = ax.hypot(ay);
+                let head = f32::min(0.3 * len, 0.35 * cell);
+                let (ux, uy) = (ax / len, ay / len);
+                for side in [1.0f32, -1.0] {
+                    let (hx, hy) = (x2 - head * (ux + side * 0.5 * uy), y2 - head * (uy - side * 0.5 * ux));
+                    ops.push(Op::Line { x1: x2, y1: y2, x2: hx, y2: hy, width: 1.1, color });
+                }
+            }
+        }
+    }
+    let xw = fonts().width(x_label, small, FontId::Main);
+    ops.push(Op::Text { x: px + pw / 2.0 - xw / 2.0, y: h - 4.0, size: small, text: x_label.to_string(), font: FontId::Main, color: BLACK });
+    ops.push(Op::Text { x: 2.0, y: top - 4.0, size: small, text: f.y_label.clone(), font: FontId::Main, color: BLACK });
+    let legend = format!("max {} {}", format_number(max), f.unit);
+    let lw = fonts().width(&legend, small, FontId::Main);
+    ops.push(Op::Text { x: w - lw - 2.0, y: top - 4.0, size: small, text: legend, font: FontId::Main, color: GREY });
     ops
 }
 

@@ -314,6 +314,7 @@ const FUNCTIONS: &[(&str, &[&str])] = &[
     ("Financieel", &["pv(", "fv(", "pmt(", "nper(", "rate(", "npv(", "irr(", "mirr(", "eff(", "nom(", "cumint(", "cumprinc("]),
     ("Interpolatie", &["linterp(", "cspline(", "interp("]),
     ("Tekst", &["concat(", "strlen(", "substr(", "search(", "num2str(", "str2num("]),
+    ("Opzoektabellen", &["tabel(\"IPE\")", "tabel(\"HEA\")", "tabel(\"HEB\")", "tabel(\"bout\")", "tabel(\"boutklasse\")", "tabel(\"materiaal\")", "tabel(\"beton\")"]),
     ("Bestanden (Excel, CSV)", &["READEXCEL(", "READCSV(", "READFILE(", "WRITEEXCEL(", "WRITECSV(", "WRITEFILE("]),
 ];
 

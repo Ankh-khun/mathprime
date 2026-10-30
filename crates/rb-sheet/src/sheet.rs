@@ -497,6 +497,16 @@ fn eval_sweep(env: &Env, spec: &SweepSpec) -> Result<Vec<String>, Error> {
 
 /// Korte beschrijving van een grafiek voor de tekstweergave.
 pub fn plot_summary(p: &PlotData) -> String {
+    const DRAW: &str = "(tekening: mathprime-cli export of de grafische versie)";
+    if let Some(s) = &p.surface {
+        return format!("oppervlak {} × {} punten {DRAW}", s.xs.len(), s.ys.len());
+    }
+    if let Some(c) = &p.curve3d {
+        return format!("3D-kromme, {} punten {DRAW}", c.x.len());
+    }
+    if let Some(f) = &p.field {
+        return format!("vectorveld {} × {} punten {DRAW}", f.xs.len(), f.ys.len());
+    }
     let n = p.series.first().map_or(0, |s| s.points.len());
     let xs: Vec<f64> = p.series.first().map(|s| s.points.iter().map(|q| q[0]).collect()).unwrap_or_default();
     let lo = xs.iter().cloned().fold(f64::INFINITY, f64::min);

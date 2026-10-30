@@ -452,6 +452,7 @@ impl Env {
                         Value::Str(_) => {
                             return Err(dom("tekst kan (nog) geen element van een matrix zijn"))
                         }
+                        Value::Table(_) => return Err(value::table_err()),
                     }
                 }
                 Ok(Value::Matrix(Matrix::from_complex(rows.len(), rows[0].len(), data)))
@@ -533,7 +534,7 @@ impl Env {
                     let items: Vec<Value> = match self.eval(iter, scope, depth)? {
                         Value::Range(r) => (0..r.n).map(|k| Value::Num(r.get(k))).collect(),
                         Value::Matrix(m) => m.elems().into_iter().map(Value::from).collect(),
-                        v @ (Value::Num(_) | Value::Complex(_)) => vec![v],
+                        v @ (Value::Num(_) | Value::Complex(_) | Value::Table(_)) => vec![v],
                         // een tekst teken voor teken
                         Value::Str(s) => s.chars().map(|c| Value::Str(c.to_string())).collect(),
                     };
@@ -757,7 +758,44 @@ impl Env {
         self.eval(&args[args.len() - 1], loc, depth)
     }
 
+    /// `tabel("IPE")`, en een tabel als functie: `IPE("IPE200")` is een rij, `IPE("IPE200", "Iy")` een waarde.
+    fn table_call(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Option<Result<Value, Error>> {
+        let text = |e: &Expr| -> Result<String, Error> {
+            match self.eval(e, loc, depth)? {
+                Value::Str(s) => Ok(s),
+                Value::Num(q) => Ok(rb_units::format_number(q.value)),
+                o => Err(dom(format!("een sleutel of kolomnaam moet tekst of een getal zijn, geen {}", o.kind()))),
+            }
+        };
+        if !self.funcs.contains_key(name) && matches!(name, "tabel" | "table") {
+            let r = (|| {
+                if args.is_empty() || args.len() > 3 {
+                    return Err(Error::Arity { name: name.to_string(), expected: "1 tot 3".to_string(), got: args.len() });
+                }
+                let t = crate::tables::load(&text(&args[0])?)?;
+                Self::table_pick(&t, &args[1..], &text)
+            })();
+            return Some(r);
+        }
+        let Some(Value::Table(t)) = self.lookup(name, loc) else { return None };
+        let t = t.clone();
+        Some(Self::table_pick(&t, args, &text))
+    }
+
+    fn table_pick(t: &std::sync::Arc<crate::tables::Table>, args: &[Expr], text: &dyn Fn(&Expr) -> Result<String, Error>) -> Result<Value, Error> {
+        match args {
+            [] => Ok(Value::Table(t.clone())),
+            [col] if t.rows.len() == 1 => Ok(Value::Num(t.value(&text(col)?)?)),
+            [key] => Ok(Value::Table(std::sync::Arc::new(t.row(&text(key)?)?))),
+            [key, col] => Ok(Value::Num(t.row(&text(key)?)?.value(&text(col)?)?)),
+            _ => Err(Error::Arity { name: t.name.clone(), expected: "1 of 2".to_string(), got: args.len() }),
+        }
+    }
+
     fn call(&self, name: &str, args: &[Expr], loc: &Locals, depth: usize) -> Result<Value, Error> {
+        if let Some(r) = self.table_call(name, args, loc, depth) {
+            return r;
+        }
         if let Some(f) = self.funcs.get(name) {
             if depth >= MAX_DEPTH {
                 return Err(Error::Depth);
@@ -898,6 +936,21 @@ impl Env {
     }
 
     /// De weergave-eenheid die uit een uitdrukking volgt (zie [`Display::Hint`]).
+    fn table_hint(&self, f: &str, args: &[Expr]) -> Option<String> {
+        let Some(Expr::Str(col)) = args.last() else { return None };
+        let table = match f {
+            "tabel" | "table" if !self.funcs.contains_key(f) => {
+                let Some(Expr::Str(name)) = args.first() else { return None };
+                crate::tables::load(name).ok()?
+            }
+            _ => match self.lookup(f, &Locals::new()) {
+                Some(Value::Table(t)) => t.clone(),
+                _ => return None,
+            },
+        };
+        table.unit_of(col).map(str::to_string)
+    }
+
     fn hint_of(&self, e: &Expr) -> Option<String> {
         if let Some(h) = self.unit_chain_hint(e) {
             return h;
@@ -924,6 +977,8 @@ impl Env {
                 }
             }
             Expr::Bin(BinOp::Div, a, b) if is_pure_number(b) => self.hint_of(a),
+            // een waarde uit een opzoektabel: in de eenheid van de kolom
+            Expr::Call(f, args) if matches!(args.last(), Some(Expr::Str(_))) && self.table_hint(f, args).is_some() => self.table_hint(f, args),
             Expr::Call(f, args) if !self.funcs.contains_key(f) => match f.as_str() {
                 "abs" | "min" | "max" | "hypot" | "mean" | "median" | "sum" => {
                     args.iter().map(|a| self.hint_of(a)).reduce(merge_hints).flatten()

@@ -18,6 +18,24 @@ pub fn english() -> bool {
     ENGELS.load(Ordering::Relaxed)
 }
 
+/// Is de taal van Windows iets anders dan Nederlands?
+pub fn system_english() -> bool {
+    #[cfg(windows)]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetUserDefaultUILanguage() -> u16;
+        }
+        // SAFETY: een Win32-functie zonder argumenten die alleen een getal teruggeeft
+        let lang = unsafe { GetUserDefaultUILanguage() };
+        lang & 0x3ff != 0x13 // primaire taal 0x13: Nederlands
+    }
+    #[cfg(not(windows))]
+    {
+        !std::env::var("LANG").is_ok_and(|l| l.starts_with("nl"))
+    }
+}
+
 /// De tekst in de gekozen taal.
 pub fn t(nl: &str) -> &str {
     if !english() {
@@ -140,6 +158,7 @@ const VERTALING: &[(&str, &str)] = &[
     ("Oplossen", "Solving"),
     ("Speciale functies", "Special functions"),
     ("Financieel", "Financial"),
+    ("Opzoektabellen", "Lookup tables"),
     ("Interpolatie", "Interpolation"),
     ("Bestanden (Excel, CSV)", "Files (Excel, CSV)"),
     // lint: opschriften onder de knoppen
@@ -272,6 +291,7 @@ const VERTALING: &[(&str, &str)] = &[
     ("Zoeken naar updates…", "Check for updates…"),
     ("wachten op het scherm (na herstarten)", "wait for the display (after restart)"),
     // overig
+    ("Sleep om te draaien; dubbelklik zet de blik terug", "Drag to rotate; double-click resets the view"),
     ("Bij inlezen staat op die plek een grijze notitie; bij opslaan staat de regio in Mathcad als tekst.", "When reading, a grey note is placed there; when saving, the region is stored in Mathcad as text."),
     ("De tekst van het werkblad tonen of verbergen (Ctrl+Shift+B)", "Show or hide the text of the worksheet (Ctrl+Shift+B)"),
     ("Geen instellingenmap gevonden; de standaardtoetsen gelden.", "No settings folder found; the default keys apply."),

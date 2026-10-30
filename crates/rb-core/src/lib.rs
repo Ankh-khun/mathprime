@@ -17,6 +17,7 @@ pub mod builtins;
 pub mod solve;
 pub mod strings;
 pub mod symbolic;
+pub mod tables;
 mod error;
 mod eval;
 pub mod finance;
@@ -34,7 +35,7 @@ pub use error::Error;
 pub use eval::{constant_value, Defined, Env, FileIo, Outcome, UserFn};
 pub use lexer::{lex, Tok, Token};
 pub use parser::{parse_expr_str, parse_stmt};
-pub use render::{complex_text, format_complex, format_rows, matrix_cells, prefix_lines, render_value, scalar_parts, Display, MatrixCells};
+pub use render::{complex_text, format_complex, format_rows, matrix_cells, prefix_lines, render_value, table_text, scalar_parts, Display, MatrixCells};
 pub use value::{Complex, Matrix, RangeVal, Value};
 
 /// Stackgrootte voor [`with_stack`].

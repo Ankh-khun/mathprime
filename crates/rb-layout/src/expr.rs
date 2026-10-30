@@ -362,6 +362,9 @@ pub fn value_box(m: &dyn Metrics, value: &Value, display: &Option<Display>, opts
     if let Value::Str(s) = value {
         return text(m, &format!("\u{201C}{s}\u{201D}"), size, Style::Result);
     }
+    if let Value::Table(t) = value {
+        return text(m, &rb_core::table_text(t), size, Style::Result);
+    }
     if let Ok(Some((num, unit))) = scalar_parts(value, display) {
         return with_unit(m, result_number(m, &num, size), &unit, size);
     }

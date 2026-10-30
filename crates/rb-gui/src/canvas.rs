@@ -1669,8 +1669,12 @@ impl App {
 
     /// Lees de instellingen uit instellingen.txt (zie settings.rs).
     pub(crate) fn load_settings(&mut self) {
-        let Some(text) = self.settings_path().and_then(|p| std::fs::read_to_string(p).ok()) else { return };
+        let text = self.settings_path().and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
         self.cv.set = crate::settings::Settings::parse(&text);
+        // nog geen taal gekozen: die van Windows
+        if !text.lines().any(|l| l.trim_start_matches('\u{feff}').trim_start().starts_with("taal")) {
+            self.cv.set.english = crate::taal::system_english();
+        }
         self.cv.dark = self.cv.set.thema == crate::settings::Thema::Donker;
         rb_units::set_significant_digits(self.cv.set.digits);
         crate::taal::set_english(self.cv.set.english);

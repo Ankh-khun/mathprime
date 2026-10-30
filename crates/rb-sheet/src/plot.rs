@@ -6,6 +6,8 @@
 //! plot vx : vy, vz                            vectoren (meetpunten) tegen elkaar
 //! plot f = 10 ; 1e5 : H(f) | log xy            logaritmische assen (Bode)
 //! plot x = 0 ; 10 : sin(x) | y = -2 ; 2         vaste grenzen van de y-as
+//! plot t = 0 ; 10 : cos(t), sin(t), t | 3d       een kromme in de ruimte
+//! plot x = -2 ; 2, y = -2 ; 2 : -y, x | field    een vectorveld
 //! ```
 //!
 //! Opties staan na de laatste `|`, gescheiden door komma's: `log x`, `log y`, `log xy`,
@@ -61,6 +63,28 @@ pub struct Surface {
     pub contour: bool,
 }
 
+/// Een kromme in de ruimte, in weergave-eenheden; NaN waar niet uit te rekenen.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Curve3d {
+    pub x: Vec<f64>,
+    pub y: Vec<f64>,
+    pub z: Vec<f64>,
+    /// De labels van de x-, y- en z-as.
+    pub labels: [String; 3],
+}
+
+/// Een vectorveld op een rooster: `u[j * xs.len() + i]` en `v[..]` horen bij (xs[i], ys[j]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Field {
+    pub xs: Vec<f64>,
+    pub ys: Vec<f64>,
+    pub u: Vec<f64>,
+    pub v: Vec<f64>,
+    pub y_label: String,
+    /// De eenheid van de pijlen, bijvoorbeeld `[m/s]` (leeg voor dimensieloos).
+    pub unit: String,
+}
+
 /// De opties na `|`.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PlotOptions {
@@ -72,6 +96,10 @@ pub struct PlotOptions {
     pub polar: bool,
     /// `contour`: een oppervlak als hoogtelijnen.
     pub contour: bool,
+    /// `3d`: drie reeksen zijn x, y en z van een kromme in de ruimte.
+    pub curve3d: bool,
+    /// `field`: twee reeksen zijn de componenten van een vectorveld op een rooster.
+    pub field: bool,
 }
 
 /// Eén lijn in een grafiek.
@@ -101,6 +129,30 @@ pub struct PlotData {
     pub y2_label: String,
     /// Een oppervlak (`plot x = .., y = .. : f(x, y)`); dan zijn `series` leeg.
     pub surface: Option<Surface>,
+    /// Een kromme in de ruimte (`| 3d`); dan zijn `series` leeg.
+    pub curve3d: Option<Curve3d>,
+    /// Een vectorveld (`| field`); dan zijn `series` leeg.
+    pub field: Option<Field>,
+}
+
+impl PlotData {
+    fn empty() -> PlotData {
+        PlotData {
+            x_label: String::new(),
+            y_label: String::new(),
+            series: Vec::new(),
+            log_x: false,
+            log_y: false,
+            x_range: None,
+            y_range: None,
+            polar: false,
+            series2: Vec::new(),
+            y2_label: String::new(),
+            surface: None,
+            curve3d: None,
+            field: None,
+        }
+    }
 }
 
 impl PlotSpec {
@@ -186,6 +238,10 @@ fn parse_options(src: &str) -> Option<Result<PlotOptions, Error>> {
             o.polar = true;
         } else if item == "contour" || item == "hoogtelijnen" {
             o.contour = true;
+        } else if item == "3d" {
+            o.curve3d = true;
+        } else if item == "field" || item == "veld" {
+            o.field = true;
         } else if let Some(axes) = item.strip_prefix("log") {
             let axes = axes.trim();
             if axes.is_empty() || !axes.chars().all(|c| c == 'x' || c == 'y') {
@@ -298,7 +354,16 @@ pub fn parse_plot(rest: &str) -> Result<PlotSpec, Error> {
         }
         _ => return Err(perr("plot: hooguit twee groepen reeksen (links en rechts), gescheiden door ';'")),
     };
-    if y.is_some() && (series.len() != 1 || !series2.is_empty()) {
+    if opts.field && (y.is_none() || series.len() != 2 || !series2.is_empty()) {
+        return Err(perr("plot: een vectorveld vraagt twee bereiken en twee componenten: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field"));
+    }
+    if opts.curve3d {
+        let want = if matches!(x, PlotX::Data(_)) { 2 } else { 3 };
+        if y.is_some() || series.len() != want || !series2.is_empty() {
+            return Err(perr("plot: een 3D-kromme vraagt drie reeksen: plot t = a ; b : x(t), y(t), z(t) | 3d"));
+        }
+    }
+    if y.is_some() && !opts.field && (series.len() != 1 || !series2.is_empty()) {
         return Err(perr("plot: een oppervlak heeft één functie: plot x = a ; b, y = c ; d : f(x, y)"));
     }
     if opts.polar && (y.is_some() || !series2.is_empty()) {
@@ -375,7 +440,13 @@ fn group_scale(env: &Env, ys: &[Vec<Option<Quantity>>], unit: &Option<(Expr, Str
 
 /// Reken een grafiek uit.
 pub fn eval_plot(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
+    if spec.opts.curve3d {
+        return eval_curve3d(env, spec);
+    }
     if let Some(yaxis) = &spec.y {
+        if spec.opts.field {
+            return eval_field(env, spec, yaxis);
+        }
         return eval_surface(env, spec, yaxis);
     }
     // alle reeksen: eerst de linker, dan de rechter y-as
@@ -529,10 +600,113 @@ pub fn eval_plot(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
         series2,
         y2_label,
         surface: None,
+        curve3d: None,
+        field: None,
     })
 }
 
 /// Een oppervlak z = f(x, y) op een rooster (standaard 40 × 40 punten).
+/// `plot t = a ; b : x(t), y(t), z(t) | 3d` of `plot vx : vy, vz | 3d`: een kromme in de ruimte.
+fn eval_curve3d(env: &Env, spec: &PlotSpec) -> Result<PlotData, Error> {
+    let mut first_error: Option<Error> = None;
+    let mut cols: Vec<Vec<Option<Quantity>>>;
+    let mut names: Vec<String> = spec.series.iter().map(|(_, t)| t.clone()).collect();
+    match &spec.x {
+        PlotX::Range { var, start, end, points } => {
+            let (ts, tdim) = axis_values(env, start, end, points, DEFAULT_POINTS, 100_000.0, false)?;
+            let mut env2 = env.clone();
+            cols = vec![Vec::with_capacity(ts.len()); 3];
+            for &t in &ts {
+                env2.set_var(var, Quantity::new(t, tdim));
+                for (k, (e, _)) in spec.series.iter().enumerate() {
+                    match env2.eval_expr(e).and_then(|v| v.as_quantity("een reeks")) {
+                        Ok(q) => cols[k].push(Some(q)),
+                        Err(err) => {
+                            first_error.get_or_insert(err);
+                            cols[k].push(None);
+                        }
+                    }
+                }
+            }
+        }
+        PlotX::Data(ex) => {
+            let xs = real_vector(env.eval_expr(ex)?, "een x-vector")?;
+            cols = vec![xs.into_iter().map(Some).collect()];
+            for (e, _) in &spec.series {
+                cols.push(real_vector(env.eval_expr(e)?, "een y-vector")?.into_iter().map(Some).collect());
+            }
+            if cols.iter().any(|c| c.len() != cols[0].len()) {
+                return Err(perr("plot: de drie vectoren moeten evenveel elementen hebben"));
+            }
+            names.insert(0, String::new());
+        }
+    }
+    let mut axes: Vec<Vec<f64>> = Vec::with_capacity(3);
+    let mut labels: Vec<String> = Vec::with_capacity(3);
+    for (k, col) in cols.iter().enumerate() {
+        let unit = if k == 2 { &spec.unit } else { &None };
+        let Some((_, div, text)) = group_scale(env, std::slice::from_ref(col), unit, "as")? else {
+            return Err(first_error.unwrap_or_else(|| Error::Domain("plot: geen enkel punt uit te rekenen".into())));
+        };
+        axes.push(col.iter().map(|q| q.map_or(f64::NAN, |q| q.value / div)).collect());
+        labels.push(format!("{} {}", names[k], label(&text)).trim().to_string());
+    }
+    let z = axes.pop().expect("z");
+    let y = axes.pop().expect("y");
+    let x = axes.pop().expect("x");
+    Ok(PlotData {
+        curve3d: Some(Curve3d { x, y, z, labels: [labels[0].clone(), labels[1].clone(), labels[2].clone()] }),
+        ..PlotData::empty()
+    })
+}
+
+/// `plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field`: een vectorveld op een rooster.
+fn eval_field(env: &Env, spec: &PlotSpec, yaxis: &(String, Expr, Expr, Option<Expr>)) -> Result<PlotData, Error> {
+    let PlotX::Range { var: xvar, start, end, points } = &spec.x else {
+        return Err(perr("plot: een vectorveld vraagt twee bereiken: plot x = a ; b, y = c ; d : u(x, y), v(x, y) | field"));
+    };
+    let (yvar, ystart, yend, ypoints) = yaxis;
+    let (xs, xdim) = axis_values(env, start, end, points, 15.0, 100.0, false)?;
+    let (ys, ydim) = axis_values(env, ystart, yend, ypoints, 15.0, 100.0, false)?;
+    let mut env2 = env.clone();
+    let mut comps: Vec<Vec<Option<Quantity>>> = vec![Vec::with_capacity(xs.len() * ys.len()); 2];
+    let mut first_error: Option<Error> = None;
+    for &y in &ys {
+        env2.set_var(yvar, Quantity::new(y, ydim));
+        for &x in &xs {
+            env2.set_var(xvar, Quantity::new(x, xdim));
+            for (k, (e, _)) in spec.series.iter().enumerate() {
+                match env2.eval_expr(e).and_then(|v| v.as_quantity("een reeks")) {
+                    Ok(q) => comps[k].push(Some(q)),
+                    Err(err) => {
+                        first_error.get_or_insert(err);
+                        comps[k].push(None);
+                    }
+                }
+            }
+        }
+    }
+    let Some((_, div, text)) = group_scale(env, &comps, &spec.unit, "pijlen")? else {
+        return Err(first_error.unwrap_or_else(|| Error::Domain("plot: geen enkel punt uit te rekenen".into())));
+    };
+    let mag = |v: &[f64]| v.iter().fold(0.0f64, |m, x| m.max(x.abs()));
+    let (xdiv, xunit) = auto_scale(mag(&xs), xdim);
+    let (ydiv, yunit) = auto_scale(mag(&ys), ydim);
+    let scaled = |c: &[Option<Quantity>]| c.iter().map(|q| q.map_or(f64::NAN, |q| q.value / div)).collect::<Vec<f64>>();
+    Ok(PlotData {
+        x_label: format!("{xvar} {}", label(&xunit)).trim().to_string(),
+        field: Some(Field {
+            xs: xs.iter().map(|x| x / xdiv).collect(),
+            ys: ys.iter().map(|y| y / ydiv).collect(),
+            u: scaled(&comps[0]),
+            v: scaled(&comps[1]),
+            y_label: format!("{yvar} {}", label(&yunit)).trim().to_string(),
+            unit: label(&text),
+        }),
+        ..PlotData::empty()
+    })
+}
+
 fn eval_surface(env: &Env, spec: &PlotSpec, yaxis: &(String, Expr, Expr, Option<Expr>)) -> Result<PlotData, Error> {
     let PlotX::Range { var: xvar, start, end, points } = &spec.x else {
         return Err(perr("plot: een oppervlak vraagt twee bereiken: plot x = a ; b, y = c ; d : f(x, y)"));
@@ -582,6 +756,8 @@ fn eval_surface(env: &Env, spec: &PlotSpec, yaxis: &(String, Expr, Expr, Option<
             z_label: format!("{} {}", spec.series[0].1, label(&zunit)).trim().to_string(),
             contour: spec.opts.contour,
         }),
+        curve3d: None,
+        field: None,
     })
 }
 
@@ -612,6 +788,27 @@ mod tests {
         assert_eq!(p.series[0].1, "abs(x) * 2");
         assert!(p.unit.is_some() && p.opts.y_range.is_some() && p.opts.log_x && !p.opts.log_y);
         assert!(parse_plot("x = 0 ; 1 : x | y = 0").is_err());
+    }
+
+    #[test]
+    fn kromme_en_vectorveld() {
+        let mut env = Env::new();
+        let p = parse_plot("t = 0 ; 10 ; 21 : cos(t), sin(t), t | 3d").unwrap();
+        let d = eval_plot(&env, &p).unwrap();
+        let c = d.curve3d.expect("kromme");
+        assert_eq!(c.x.len(), 21);
+        assert!((c.z[20] - 10.0).abs() < 1e-12 && (c.x[0] - 1.0).abs() < 1e-12);
+        assert!(parse_plot("t = 0 ; 10 : cos(t), sin(t) | 3d").is_err());
+        // vectoren, met eenheden per as
+        env.set_var("vx", Quantity::new(1.0, Dim::NONE));
+        let p = parse_plot("x = -1 ; 1 ; 3, y = -2 ; 2 ; 5 : -y, x | field").unwrap();
+        let d = eval_plot(&env, &p).unwrap();
+        let f = d.field.expect("veld");
+        assert_eq!((f.xs.len(), f.ys.len(), f.u.len(), f.v.len()), (3, 5, 15, 15));
+        // in (1, -2): u = 2, v = 1
+        assert_eq!((f.u[2], f.v[2]), (2.0, 1.0));
+        assert!(parse_plot("x = 0 ; 1, y = 0 ; 1 : x | field").is_err());
+        assert!(parse_plot("x = 0 ; 1 : x, x | field").is_err());
     }
 
     #[test]

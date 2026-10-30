@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn elke_melding_is_vertaald() {
         // de uitvoer van `mathprime-cli deps` blijft Nederlands, net als de rest van de command-line
-        const GEEN_MELDING: &[&str] = &["bekende functie", "    (geen)
+        const GEEN_MELDING: &[&str] = &["bekende functie", "eenheid in tabel", "    (geen)
 ", "    regel {}: {}
 ", "{} (regel {}): {}
 ", "  hangt direct af van:

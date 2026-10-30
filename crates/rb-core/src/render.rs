@@ -62,10 +62,41 @@ fn offset_text(q: Quantity, name: &str, factor: f64, offset: f64) -> Result<Stri
     Ok(format!("{} {name}", format_number((q.value - offset) / factor)))
 }
 
+/// Een tabel als tekst: bij één rij de waarden, anders de grootte en de kolommen.
+pub fn table_text(t: &crate::tables::Table) -> String {
+    if let [(key, vals)] = t.rows.as_slice() {
+        let cells: Vec<String> = t
+            .columns
+            .iter()
+            .zip(vals)
+            .map(|((c, u), q)| match lookup_scale(u) {
+                Some(f) => format!("{c} = {} {u}", format_number(q.value / f)),
+                None => format!("{c} = {}", format_number(q.value)),
+            })
+            .collect();
+        return format!("{key}: {}", cells.join(", "));
+    }
+    let cols: Vec<&str> = t.columns.iter().map(|(c, _)| c.as_str()).collect();
+    format!("tabel {} ({} rijen): {}", t.name, t.rows.len(), cols.join(", "))
+}
+
+fn lookup_scale(unit: &str) -> Option<f64> {
+    if unit.is_empty() {
+        return None;
+    }
+    let (num, den) = unit.split_once('/').map_or((unit, None), |(a, b)| (a, Some(b)));
+    let one = |t: &str| {
+        let (n, p) = t.split_once('^').map_or((t, 1), |(n, p)| (n, p.parse().unwrap_or(1)));
+        rb_units::lookup_unit(n).map(|(f, _)| f.powi(p))
+    };
+    Some(one(num)? / den.map_or(Some(1.0), one)?)
+}
+
 /// Tekstweergave van een resultaat, in de gevraagde eenheid of automatisch. Matrices met meer dan
 /// één rij beslaan meerdere regels.
 pub fn render_value(value: &Value, display: &Option<Display>) -> Result<String, Error> {
     match value {
+        Value::Table(t) => Ok(table_text(t)),
         Value::Str(s) => match display {
             Some(Display::Unit { .. } | Display::Offset { .. }) => Err(Error::Domain("tekst heeft geen eenheid; laat het vakje achter '=' leeg".into())),
             _ => Ok(format!("\"{s}\"")),
