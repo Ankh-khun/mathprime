@@ -1,0 +1,537 @@
+# Translations of the messages in rb-units, rb-core, rb-sheet and the status bar of rb-gui.
+# Per line: Dutch => English. {} matches any text; that text is translated too, unless it is in quotes
+# ('{}': a name from the worksheet). Both sides have the same number of {} in the same order.
+# crates/rb-units/src/i18n.rs reads this; a test checks that every Dutch message in the source is here.
+
+# kinds of values, operations and small parts of messages
+getal => number
+complex getal => complex number
+vector => vector
+matrix => matrix
+bereik => range
+tekst => text
+dimensieloos => dimensionless
+aftrekken => subtraction
+optellen => addition
+vergelijken => comparison
+middelen => averaging
+sorteren => sorting
+faculteit => factorial
+vermenigvuldigen => multiplication
+kolommen => columns
+rijen => rows
+eigenwaarden => eigenvalues
+een argument => an argument
+een beginwaarde => an initial value
+een beperking => a constraint
+een element => an element
+een grens => a limit
+een index => an index
+een kant van een beperking => one side of a constraint
+een reeks => a series
+een startwaarde => an initial guess
+elk argument => every argument
+het aantal => the number
+het aantal cijfers => the number of digits
+het aantal perioden => the number of periods
+het aantal punten => the number of points
+het aantal vrijheidsgraden => the degrees of freedom
+het argument => the argument
+het argument van {} => the argument of {}
+het begin van de sweep => the start of the sweep
+het begin van de x-as => the start of the x-axis
+het beginpunt => the starting point
+het eerste argument => the first argument
+het einde van de sweep => the end of the sweep
+het einde van de x-as => the end of the x-axis
+het aansluitpunt xf => the matching point xf
+het oppervlak => the surface
+het punt => the point
+het tweede argument => the second argument
+de argumenten van {} => the arguments of {}
+de bandbreedte => the bandwidth
+de beginperiode => the first period
+de beginpositie => the start position
+de beginwaarde y => the initial value y
+de bovengrens => the upper limit
+de determinant => the determinant
+de differentiaalvergelijking => the differential equation
+de eenheid van de y-as => the unit of the y-axis
+de eigenwaarde => the eigenvalue
+de eindperiode => the last period
+de eindwaarde => the end value
+de exponent => the exponent
+de functie => the function
+de functie in root => the function in root
+de functie uit odesolve => the function from odesolve
+de graad => the degree
+de grenzen van bvalfit => the limits of bvalfit
+de grenzen van de differentiaalvergelijking => the limits of the differential equation
+de grenzen van de x-as => the limits of the x-axis
+de grenzen van de y-as => the limits of the y-axis
+de grenzen van een bereik => the limits of a range
+de grenzen van root => the limits of root
+de grenzen van sbval => the limits of sbval
+de grootte => the size
+de index => the index
+de integratiegrenzen => the integration limits
+de inverse => the inverse
+de lengte => the length
+de norm => the norm
+de normale verdeling (x en μ) => the normal distribution (x and μ)
+de normale verdeling (μ en σ) => the normal distribution (μ and σ)
+de ondergrens => the lower limit
+de orde => the order
+de orde van de afgeleide => the order of the derivative
+de orde van de reeks => the order of the series
+de parameters van de verdeling => the parameters of the distribution
+de rente => the interest rate
+de startwaarde => the initial guess
+de startwaarden v => the initial guesses v
+de startwaarden v1 => the initial guesses v1
+de startwaarden v2 => the initial guesses v2
+de sweep (begin en einde) => the sweep (start and end)
+de uniforme verdeling => the uniform distribution
+de vergelijking bevat => the equation contains
+de vergelijkingen bevatten => the equations contain
+de vormparameter => the shape parameter
+de x-as (begin en einde) => the x-axis (start and end)
+de y-as (reeksen en eenheid) => the y-axis (series and unit)
+de zoekwaarde => the search value
+een bereik (begin en einde) => a range (start and end)
+een bereik (begin en volgende waarde) => a range (start and next value)
+een grens van {} => a limit of {}
+weergeven in deze eenheid => showing in this unit
+eigenvec (eigenwaarde en matrix) => eigenvec (eigenvalue and matrix)
+hist (grenzen en gegevens) => hist (limits and data)
+interp (x en vx) => interp (x and vx)
+ksmooth (bandbreedte en vx) => ksmooth (bandwidth and vx)
+linterp (x en vx) => linterp (x and vx)
+odesolve (beginpunt en eindwaarde) => odesolve (starting point and end value)
+odesolve (de punten van de voorwaarden) => odesolve (the points of the conditions)
+bvalfit: de uitkomst van score => bvalfit: the result of score
+sbval: de uitkomst van score => sbval: the result of score
+{}: de uitkomst van load => {}: the result of load
+r·x bij de exponentiële verdeling => r·x in the exponential distribution
+
+# units
+eenheden komen niet overeen bij {}: {} en {} => units do not match in {}: {} and {}
+{} moet dimensieloos zijn, maar heeft eenheid {} => {} must be dimensionless, but has unit {}
+een grootheid met eenheid {} kan alleen tot een geheel getal (of een wortelmacht 1/n) worden verheven => a quantity with unit {} can only be raised to a whole number (or a root power 1/n)
+kan geen {}e-machtswortel nemen van eenheid {} => cannot take the root of order {} of unit {}
+eenheidsexponenten worden te groot => unit exponents become too large
+voor °C of °F moet een getal zonder eenheid staan, bijvoorbeeld 20 °C => °C or °F needs a number without a unit in front of it, for example 20 °C
+een temperatuur kan geen {} zijn => a temperature cannot be a {}
+{} kan alleen bij een losse temperatuur; gebruik K of Δ{} => {} only works with a single temperature; use K or Δ{}
+werkt alleen met een getal zonder eenheid; deel eerst door de eenheid => only works with a number without a unit; divide by the unit first
+de weergave-eenheid heeft waarde 0 => the display unit has value 0
+de weergave-eenheid moet een eenheid zijn, geen {} => the display unit must be a unit, not a {}
+de elementen hebben verschillende eenheden; toon ze zonder gekozen eenheid => the elements have different units; show them without a chosen unit
+tekst heeft geen eenheid; laat het vakje achter '=' leeg => text has no unit; leave the box after '=' empty
+
+# general errors
+onbekende naam '{}' (geen variabele, functie, constante of eenheid) => unknown name '{}' (not a variable, function, constant or unit)
+'{}' is geen functie => '{}' is not a function
+{} verwacht {} argument(en), maar kreeg er {} => {} expects {} argument(s), but got {}
+minstens 1 => at least 1
+{} tot {} => {} to {}
+functieaanroepen zijn te diep geneest (recursie zonder einde?) => function calls are nested too deeply (recursion without an end?)
+ongeldig resultaat (bijvoorbeeld wortel uit een negatief getal, ln van 0 of een overflow) => invalid result (for example the root of a negative number, ln of 0 or an overflow)
+deling door nul => division by zero
+even wortel uit een negatief getal => even root of a negative number
+ln(0) bestaat niet (−∞) => ln(0) does not exist (−∞)
+argument moet buiten [-1, 1] liggen => argument must be outside [-1, 1]
+argument moet groter dan 0 zijn => argument must be greater than 0
+argument moet minstens 1 zijn => argument must be at least 1
+argument moet tussen -1 en 1 liggen => argument must be between -1 and 1
+argument moet tussen -1 en 1 liggen (grenzen niet inbegrepen) => argument must be between -1 and 1 (limits not included)
+het argument moet dimensieloos en niet 0 zijn => the argument must be dimensionless and not 0
+het argument moet dimensieloos zijn => the argument must be dimensionless
+verwacht een geheel getal => expected a whole number
+verwacht een getal, geen {} => expected a number, not a {}
+verwacht een naam => expected a name
+verwacht een reële vector, geen {} => expected a real vector, not a {}
+verwacht een vector met tekencodes, geen {} => expected a vector of character codes, not a {}
+verwacht een vector of matrix => expected a vector or matrix
+verwacht een vector of matrix, geen {} => expected a vector or matrix, not a {}
+verwacht een vector, geen {} matrix => expected a vector, not a {} matrix
+verwacht {} argument(en), kreeg er {} => expected {} argument(s), got {}
+{} moet een geheel getal ≥ 0 zijn => {} must be a whole number ≥ 0
+{} moet een getal zijn, geen {} => {} must be a number, not a {}
+{} moet een reëel getal of een reële vector zijn, geen {} => {} must be a real number or a real vector, not a {}
+{} moet een reëel getal zijn, geen {} => {} must be a real number, not a {}
+{} moet groter dan 0 zijn => {} must be greater than 0
+{} moet tekst zijn, geen {} => {} must be text, not a {}
+{} moet een geheel getal van 1 tot nper zijn => {} must be a whole number from 1 to nper
+{} verwacht een vector => {} expects a vector
+{} vraagt een vierkante matrix (deze is {}) => {} needs a square matrix (this one is {})
+{} werkt (nog) niet met een complexe matrix => {} does not work with a complex matrix (yet)
+{} werkt alleen als alle elementen dezelfde eenheid hebben => {} only works if all elements have the same unit
+{}: de diagonaal moet overal dezelfde eenheid hebben => {}: the diagonal must have the same unit everywhere
+{}: de eenheid van de uitdrukking verandert onderweg => {}: the unit of the expression changes along the way
+{}: de grenzen moeten gehele getallen zijn => {}: the limits must be whole numbers
+{}: de uitdrukking moet een reëel getal geven, geen {} => {}: the expression must give a real number, not a {}
+{}: dit argument moet de naam van een eigen functie zijn (bijvoorbeeld F, met F(x) := ...) => {}: this argument must be the name of your own function (for example F, with F(x) := ...)
+{}: verwacht een geheel getal van 1 tot en met 50 => {}: expected a whole number from 1 to 50
+werkt niet met een complexe matrix => does not work with a complex matrix
+werkt niet met een {} => does not work with a {}
+werkt niet met een {}{} => does not work with a {}{}
+deze bewerking werkt (nog) niet met een complexe matrix => this operation does not work with a complex matrix (yet)
+vraagt een vierkante matrix => needs a square matrix
+vraagt minstens 2 waarden => needs at least 2 values
+vraagt minstens twee bedragen => needs at least two amounts
+vraagt minstens {} punten => needs at least {} points
+vraagt twee vectoren met 3 elementen => needs two vectors with 3 elements
+n moet een geheel getal van 0 tot en met 170 zijn => n must be a whole number from 0 to 170
+n moet een geheel getal van 1 tot en met 64 zijn => n must be a whole number from 1 to 64
+n moet een oneven geheel getal zijn, niet groter dan het aantal punten => n must be an odd whole number, not larger than the number of points
+ORIGIN moet een geheel getal zijn => ORIGIN must be a whole number
+{}: {} => {}: {}
+
+# parser and worksheet
+':' hoort alleen in ':=' (definitie) => ':' only belongs in ':=' (definition)
+']' ontbreekt bij kolom '{}' => ']' is missing at column '{}'
+'break' of 'continue' buiten een lus => 'break' or 'continue' outside a loop
+'else' zonder bijbehorende 'if' erboven (op dezelfde inspringing) => 'else' without a matching 'if' above it (at the same indentation)
+'{}' is geen kolomnaam => '{}' is not a column name
+'{}' geldt hier als eenheid/constante/functie; pas op regel {} wordt het een variabele => '{}' counts as a unit/constant/function here; it only becomes a variable on line {}
+'{}' is geen eigen functie (definieer bijvoorbeeld {}(x) := ...) => '{}' is not your own function (define for example {}(x) := ...)
+'{}' is ook een eenheid; in dit blad is het vanaf hier een variabele => '{}' is also a unit; in this sheet it is a variable from here on
+'{}' was al gedefinieerd op regel {}; vanaf hier geldt de nieuwe waarde => '{}' was already defined on line {}; the new value applies from here on
+'{}' is geen getal => '{}' is not a number
+  ← wordt nergens gebruikt =>   ← not used anywhere
+de parser staat 1 of 2 indices toe => the parser allows 1 or 2 indices
+de rijen van deze matrix zijn niet even lang => the rows of this matrix are not the same length
+de stap van een bereik moet eindig en ongelijk aan 0 zijn => the step of a range must be finite and not 0
+de tabel heeft nog geen rijen => the table has no rows yet
+de tabel wordt niet afgesloten met '}' => the table is not closed with '}'
+deze regel springt minder ver in dan de eerste regel van het blok => this line is indented less than the first line of the block
+deze regel springt verder in, maar de regel erboven opent geen blok (if, else, for, while) => this line is indented further, but the line above does not open a block (if, else, for, while)
+dit bereik loopt de verkeerde kant op: de tweede waarde ligt niet tussen begin en einde => this range runs the wrong way: the second value is not between start and end
+dit haakje wordt nergens gesloten => this bracket is never closed
+dit is een {} matrix: gebruik twee indices, M[rij, kolom] => this is a {} matrix: use two indices, M[row, column]
+een afbeelding schrijf je als 'image 200x120 data:image/png;base64,...' => write an image as 'image 200x120 data:image/png;base64,...'
+een beperking in een Given-blok moet een vergelijking zijn, zoals x + y == 10 of x > 0 => a constraint in a Given block must be an equation, such as x + y == 10 or x > 0
+een bereik kan alleen in een definitie staan, zoals 'i := 1..10' => a range can only be in a definition, such as 'i := 1..10'
+een bereik kan alleen in een gewone definitie staan, zoals 'i := 1..10' => a range can only be in a plain definition, such as 'i := 1..10'
+een bereik kan geen element van een matrix zijn => a range cannot be an element of a matrix
+een bereik mag hoogstens {} waarden hebben => a range can have at most {} values
+een complexe exponent kan alleen bij een dimensieloos grondtal en een dimensieloze exponent => a complex exponent only works with a dimensionless base and a dimensionless exponent
+een definitie over meer dan twee bereiken tegelijk kan niet (het resultaat zou meer dan 2-dimensionaal zijn) => a definition over more than two ranges at once is not possible (the result would have more than 2 dimensions)
+een exponent kan geen vector of matrix zijn => an exponent cannot be a vector or matrix
+een functie definieer je buiten het blok, niet erin => define a function outside the block, not inside it
+een functie kan niet meteen getoond worden => a function cannot be shown directly
+een functie of een element kan niet meteen getoond worden; zet 'f(1) =' in een eigen regio => a function or an element cannot be shown directly; put 'f(1) =' in its own region
+een index groter dan 100000 is waarschijnlijk een vergissing => an index above 100000 is probably a mistake
+een index heeft 1 getal (v[i]) of 2 getallen (M[i, j]) => an index has 1 number (v[i]) or 2 numbers (M[i, j])
+een index moet een geheel getal zijn, niet {} => an index must be a whole number, not {}
+een integratiegrens is geen getal => an integration limit is not a number
+een kans moet tussen 0 en 1 liggen => a probability must be between 0 and 1
+een lege matrix kan niet => an empty matrix is not possible
+een lege tekst geeft geen vector => empty text gives no vector
+een matrix als element van een matrix kan niet; gebruik augment of stack => a matrix as an element of a matrix is not possible; use augment or stack
+een matrix kan alleen tot een gehele macht worden verheven => a matrix can only be raised to a whole power
+een matrix kan alleen tot een reële, gehele macht worden verheven => a matrix can only be raised to a real, whole power
+een positie schrijf je als '@kolom,rij' met gehele getallen, bijvoorbeeld '@40,3 b := 2 m' => write a position as '@column,row' with whole numbers, for example '@40,3 b := 2 m'
+een regio over meerdere regels begint met 'naam := {' of 'f(x) := {' => a region over several lines starts with 'name := {' or 'f(x) := {'
+een tabel begint met 'tabel x [mm], F [kN] {' => a table starts with 'tabel x [mm], F [kN] {'
+een vector links van := kan alleen bij een stelsel: [x; y] := odesolve([x; y], t, eindwaarde) => a vector left of := only works with a system: [x; y] := odesolve([x; y], t, end)
+een voorwaarde moet dimensieloos zijn (een vergelijking geeft 1 of 0), maar deze heeft eenheid {} => a condition must be dimensionless (a comparison gives 1 or 0), but this one has unit {}
+een voorwaarde moet een getal zijn, geen {} => a condition must be a number, not a {}
+einde van de invoer => end of input
+gebruikt '{}' uit regel {}, en die bevat een fout => uses '{}' from line {}, which contains an error
+gebruikt regel {}, en die bevat een fout => uses line {}, which contains an error
+het blok is leeg => the block is empty
+het blok wordt niet afgesloten met een regel '}' => the block is not closed with a line '}'
+het einde van een bereik ligt voor het begin => the end of a range is before the start
+het programmablok geeft geen waarde (de laatste regel is een lus zonder resultaat) => the program block gives no value (the last line is a loop without a result)
+het tweede argument moet een naam zijn; schrijfwijze: {} => the second argument must be a name; syntax: {}
+index {} ligt onder ORIGIN ({}) => index {} is below ORIGIN ({})
+index {} valt buiten de {} (geldige indices {} t/m {}) => index {} is outside the {} (valid indices {} to {})
+index {} valt buiten het bereik {} t/m {} => index {} is outside the range {} to {}
+lege cel in rij {}, kolom {} => empty cell in row {}, column {}
+lege invoer => empty input
+lege uitdrukking => empty expression
+links van ':=' moet een naam staan, een functie zoals f(x, y) of een element zoals v[i] => left of ':=' must be a name, a function such as f(x, y) or an element such as v[i]
+met tekst kun je niet rekenen; gebruik concat(a, b) om tekst samen te voegen => you cannot calculate with text; use concat(a, b) to join text
+na ':=' ontbreekt een uitdrukking => an expression is missing after ':='
+na 'else' komt niets, of 'if' met een voorwaarde => after 'else' comes nothing, or 'if' with a condition
+na 'return' hoort een waarde => a value belongs after 'return'
+na '{}' hoort een komma en de naam, zoals '{}, x' => a comma and the name belong after '{}', such as '{}, x'
+na '{}' moet minstens één ingesprongen regel volgen => at least one indented line must follow '{}'
+na de positie '@kolom,rij' ontbreekt de inhoud van de regio => the content of the region is missing after the position '@column,row'
+onbekend sleutelwoord '{}' na →; gebruik simplify, expand, factor, solve, x, substitute, x = …, limit, x = a, series, x = a, n of float, n => unknown keyword '{}' after →; use simplify, expand, factor, solve, x, substitute, x = …, limit, x = a, series, x = a, n or float, n
+ongeldig getal '{}' => invalid number '{}'
+ongeldige cel '{}' => invalid cell '{}'
+onverwacht teken '{}' => unexpected character '{}'
+regel {} van het blok: {} => line {} of the block: {}
+regio {} bestaat niet => region {} does not exist
+rij {} heeft {} cellen, de tabel heeft {} kolommen => row {} has {} cells, the table has {} columns
+rij {}, kolom {} is geen getal: '{}' => row {}, column {} is not a number: '{}'
+te veel combinaties van bereikwaarden (hoogstens {}) => too many combinations of range values (at most {})
+te veel herhalingen (meer dan {}); loopt een while-lus oneindig door? => too many iterations (more than {}); does a while loop run forever?
+tekst kan (nog) geen element van een matrix zijn => text cannot be an element of a matrix (yet)
+verwacht ',' (volgend element), ';' (volgende rij) of ']' in de matrix, maar vond {} => expected ',' (next element), ';' (next row) or ']' in the matrix, but found {}
+verwacht ',' of {} in {}, maar vond {} => expected ',' or {} in {}, but found {}
+verwacht '..' (een bereik schrijf je als 'begin .. einde' of 'begin, volgende .. einde') => expected '..' (write a range as 'start .. end' or 'start, next .. end')
+verwacht ':=' (definitie) of '=' (resultaat tonen) => expected ':=' (definition) or '=' (show result)
+verwacht een getal, naam of haakje, maar vond {} => expected a number, name or bracket, but found {}
+kan geen rekenthread starten => cannot start a calculation thread
+
+# matrices
+A en B moeten even groot zijn => A and B must have the same size
+alle delen moeten evenveel kolommen hebben => all parts must have the same number of columns
+alle delen moeten evenveel rijen hebben => all parts must have the same number of rows
+alle elementen van een vector moeten dezelfde eenheid hebben => all elements of a vector must have the same unit
+alleen een vector of matrix heeft een index, dit is een {} => only a vector or matrix has an index, this is a {}
+alleen een vierkante matrix kan tot een macht worden verheven (deze is {}) => only a square matrix can be raised to a power (this one is {})
+alleen reële getallen kun je ordenen met <, ≤, > of ≥ (niet een {} en een {}) => only real numbers can be ordered with <, ≤, > or ≥ (not a {} and a {})
+beide vectoren moeten evenveel elementen hebben => both vectors must have the same number of elements
+bij {}: elk element moet een getal zijn, geen {} => in {}: every element must be a number, not a {}
+cholesky vraagt een positief-definiete matrix => cholesky needs a positive definite matrix
+cholesky vraagt een symmetrische matrix => cholesky needs a symmetric matrix
+complexe getallen kun je niet sorteren => complex numbers cannot be sorted
+complexe getallen kunnen niet in een bestand => complex numbers cannot go in a file
+de eigenwaarden convergeren niet => the eigenvalues do not converge
+de matrix is singulier (determinant 0): er is geen inverse of eenduidige oplossing => the matrix is singular (determinant 0): there is no inverse or unique solution
+de waarde komt niet voor => the value does not occur
+de waarde komt niet voor in de eerste kolom => the value does not occur in the first column
+delen door een matrix kan niet; gebruik inverse(M) of M^-1 => dividing by a matrix is not possible; use inverse(M) or M^-1
+eigenvec: alle kolommen moeten dezelfde eenheid hebben => eigenvec: all columns must have the same unit
+eigenvecs: alle kolommen moeten dezelfde eenheid hebben => eigenvecs: all columns must have the same unit
+eigenvector: inverse iteratie mislukt => eigenvector: inverse iteration failed
+het inproduct vraagt twee vectoren met evenveel elementen => the dot product needs two vectors with the same number of elements
+lsolve: b moet een vector met {} elementen zijn (nu {}) => lsolve: b must be a vector with {} elements (now {})
+lsolve: de eenheden van b passen niet bij de matrix => lsolve: the units of b do not fit the matrix
+matrices van verschillende grootte bij {}: {} en {} => matrices of different sizes in {}: {} and {}
+matrixgrootte klopt niet => matrix size is not right
+van een matrix bestaat geen abs; gebruik det(M) of norm(M) => a matrix has no abs; use det(M) or norm(M)
+wortel uit een negatief getal in een matrix (complexe matrices worden nog niet ondersteund) => root of a negative number in a matrix (complex matrices are not supported yet)
+svd vraagt minstens evenveel rijen als kolommen; gebruik svd(transpose(A)) => svd needs at least as many rows as columns; use svd(transpose(A))
+polyroots verwacht een vector met coëfficiënten (oplopend: c0, c1, c2, ...) => polyroots expects a vector of coefficients (ascending: c0, c1, c2, ...)
+polyroots: alle coëfficiënten zijn 0 => polyroots: all coefficients are 0
+polyroots: de eenheden van de coëfficiënten passen niet bij elkaar => polyroots: the units of the coefficients do not match
+polyroots: een constant polynoom heeft geen nulpunten => polyroots: a constant polynomial has no roots
+
+# special functions and distributions
+I_ν(0) is oneindig voor ν < 0 => I_ν(0) is infinite for ν < 0
+I_ν(x) met niet-gehele orde bestaat alleen voor x ≥ 0 => I_ν(x) of non-integer order only exists for x ≥ 0
+J_ν(0) is oneindig voor ν < 0 => J_ν(0) is infinite for ν < 0
+J_ν(x) met niet-gehele orde bestaat alleen voor x ≥ 0 => J_ν(x) of non-integer order only exists for x ≥ 0
+K_n(x) bestaat alleen voor x > 0 => K_n(x) only exists for x > 0
+K_ν(x) bestaat alleen voor x > 0 => K_ν(x) only exists for x > 0
+Y_n(x) bestaat alleen voor x > 0 => Y_n(x) only exists for x > 0
+Y_ν(x) bestaat alleen voor x > 0 => Y_ν(x) only exists for x > 0
+js(n, 0) is oneindig voor n < 0 => js(n, 0) is infinite for n < 0
+ys(n, x) bestaat alleen voor x > 0 => ys(n, x) only exists for x > 0
+Γ bestaat niet in 0 en de negatieve gehele getallen => Γ does not exist at 0 and the negative integers
+Ψ bestaat niet in 0 en de negatieve gehele getallen => Ψ does not exist at 0 and the negative integers
+de orde moet een geheel getal tot 1000 zijn => the order must be a whole number up to 1000
+de orde moet tussen −1000 en 1000 liggen => the order must be between −1000 and 1000
+de orde van de afgeleide moet 1 tot en met 5 zijn => the order of the derivative must be 1 to 5
+de graad moet een geheel getal van 0 tot en met 20 zijn => the degree must be a whole number from 0 to 20
+de grootte moet 1 tot en met 1000 zijn => the size must be 1 to 1000
+de klassegrenzen moeten oplopen => the class limits must be ascending
+het aantal decimalen moet een geheel getal zijn => the number of decimals must be a whole number
+het aantal klassen moet 1 tot en met 100000 zijn => the number of classes must be 1 to 100000
+b moet groter zijn dan a => b must be greater than a
+
+# finance
+alle bedragen moeten dezelfde eenheid hebben => all amounts must have the same unit
+de beginperiode ligt na de eindperiode => the first period is after the last period
+de reeks moet minstens één positief en één negatief bedrag hebben => the series must have at least one positive and one negative amount
+de rente moet groter dan −1 zijn => the interest rate must be greater than −1
+geen eindige uitkomst voor deze invoer => no finite result for this input
+geen intern rendement gevonden; probeer een andere startwaarde => no internal rate of return found; try another initial guess
+geen rente gevonden; probeer een andere startwaarde => no interest rate found; try another initial guess
+het aantal perioden moet groter dan 0 zijn => the number of periods must be greater than 0
+pv en fv moeten hetzelfde teken hebben => pv and fv must have the same sign
+type moet 0 (eind van de periode) of 1 (begin) zijn => type must be 0 (end of the period) or 1 (start)
+vraagt een rente ≠ 0 en pv en fv met hetzelfde teken => needs an interest rate ≠ 0 and pv and fv with the same sign
+
+# regression and interpolation
+alle x-waarden zijn gelijk => all x values are equal
+de basisfuncties zijn (bijna) lineair afhankelijk voor deze gegevens => the basis functions are (almost) linearly dependent for this data
+de bandbreedte moet groter dan 0 zijn => the bandwidth must be greater than 0
+een van de vectoren is constant => one of the vectors is constant
+elke rij bevat een NaN => every row contains a NaN
+geen lokaal maximum => no local maximum
+geen lokaal minimum => no local minimum
+genfit: F(x, u) heeft niet dezelfde eenheid als vy => genfit: F(x, u) does not have the same unit as vy
+het splinestelsel is singulier => the spline system is singular
+linfit: de eenheden van F(x) veranderen per punt => linfit: the units of F(x) change per point
+loess: te weinig punten rond x => loess: too few points around x
+span moet tussen 0 en 1 liggen (de fractie van de punten per lokale fit) => span must be between 0 and 1 (the fraction of points per local fit)
+te weinig gegevens: {} punten voor {} onbekende coëfficiënten => too little data: {} points for {} unknown coefficients
+vs hoort bij andere gegevens (gebruik lspline, pspline of cspline van vx en vy) => vs belongs to other data (use lspline, pspline or cspline of vx and vy)
+vx en vy moeten evenveel elementen hebben => vx and vy must have the same number of elements
+vx moet strikt oplopen => vx must be strictly ascending
+
+# solvers and differential equations
+Radau: de differentiaalvergelijking vraagt te veel stappen => Radau: the differential equation needs too many steps
+Radau: de stapgrootte wordt te klein => Radau: the step size becomes too small
+de differentiaalvergelijking vraagt te veel stappen (stijf probleem?) => the differential equation needs too many steps (stiff problem?)
+de stapgrootte wordt te klein (singuliere differentiaalvergelijking?) => the step size becomes too small (singular differential equation?)
+de functie is niet eindig vlak bij x = {} (SI); afgeleide niet te bepalen => the function is not finite near x = {} (SI); derivative cannot be determined
+de functie onder de integraal is niet eindig bij x = {} (SI) => the function under the integral is not finite at x = {} (SI)
+de oplossing van odesolve bestaat alleen tussen {} en {} => the solution of odesolve only exists between {} and {}
+deriv(uitdrukking, x, punt) of deriv(uitdrukking, x, punt, orde) => deriv(expression, x, point) or deriv(expression, x, point, order)
+root(uitdrukking, x) of root(uitdrukking, x, a, b) => root(expression, x) or root(expression, x, a, b)
+root: de functie heeft aan beide grenzen hetzelfde teken; kies grenzen waartussen een nulpunt ligt => root: the function has the same sign at both limits; choose limits with a root between them
+root: geef {} eerst een startwaarde, bijvoorbeeld {} := 1 (of gebruik root(f, {}, a, b)) => root: give {} an initial guess first, for example {} := 1 (or use root(f, {}, a, b))
+root: geen nulpunt gevonden vanaf deze startwaarde; probeer een andere startwaarde of root(f, x, a, b) met grenzen => root: no root found from this initial guess; try another guess or root(f, x, a, b) with limits
+bvalfit: score moet evenveel elementen geven als v1 en v2 samen ({}) => bvalfit: score must give as many elements as v1 and v2 together ({})
+sbval: score moet evenveel elementen geven als v ({}) => sbval: score must give as many elements as v ({})
+odesolve hoort in een definitie onder een Given-blok: y := odesolve(t, eindwaarde) => odesolve belongs in a definition under a Given block: y := odesolve(t, end)
+odesolve hoort onder een Given-blok met de differentiaalvergelijking en de beginvoorwaarden => odesolve belongs under a Given block with the differential equation and the initial conditions
+odesolve: beginvoorwaarden ontbreken => odesolve: initial conditions are missing
+odesolve: de beginvoorwaarde voor {}({}) ontbreekt => odesolve: the initial condition for {}({}) is missing
+odesolve: de beginwaarde van {} heeft eenheid {}, verwacht {} => odesolve: the initial value of {} has unit {}, expected {}
+odesolve: de randvoorwaarden leggen de oplossing niet vast => odesolve: the boundary conditions do not determine the solution
+odesolve: de randvoorwaarden zijn niet te halen (geen oplossing gevonden) => odesolve: the boundary conditions cannot be met (no solution found)
+odesolve: de vergelijking hangt niet af van {} => odesolve: the equation does not depend on {}
+odesolve: de vergelijkingen leggen {} niet vast => odesolve: the equations do not determine {}
+odesolve: de voorwaarde voor {}({}) ligt buiten het bereik van {} tot {} => odesolve: the condition for {}({}) is outside the range from {} to {}
+odesolve: een beginvoorwaarde schrijf je als {}(0) == 1 of {}'(0) == 0 => odesolve: write an initial condition as {}(0) == 1 or {}'(0) == 0
+odesolve: een voorwaarde voor de hoogste afgeleide ({}) kan niet => odesolve: a condition for the highest derivative ({}) is not possible
+odesolve: elke beperking moet een gelijkheid met == zijn => odesolve: every constraint must be an equality with ==
+odesolve: er mag maar één differentiaalvergelijking in het blok staan => odesolve: only one differential equation is allowed in the block
+odesolve: geen differentiaalvergelijking met {}'({}) gevonden => odesolve: no differential equation with {}'({}) found
+odesolve: te veel voorwaarden voor {} (de vergelijking is van orde {}) => odesolve: too many conditions for {} (the equation has order {})
+odesolve: twee voorwaarden voor {}({}) => odesolve: two conditions for {}({})
+odesolve: {} functies vragen {} differentiaalvergelijkingen, het blok heeft er {} => odesolve: {} functions need {} differential equations, the block has {}
+odesolve: {} geen afgeleide van {} => odesolve: {} no derivative of {}
+{} hoort onder een Given-blok: een regel 'Given', daaronder de vergelijkingen (met ==), dan {}(...) => {} belongs under a Given block: a line 'Given', below it the equations (with ==), then {}(...)
+{}(f, x, ...): noem eerst de functie => {}(f, x, ...): name the function first
+{}: D(x, y) moet de eenheid y/x hebben, maar een component heeft {} => {}: D(x, y) must have the unit y/x, but a component has {}
+{}: D(x, y) moet evenveel componenten geven als y ({}) => {}: D(x, y) must give as many components as y ({})
+{}: de beperkingen zijn niet te vervullen (restfout {}) => {}: the constraints cannot be met (residual {})
+{}: de onbekenden moeten namen zijn => {}: the unknowns must be names
+{}: geef {} eerst een startwaarde boven het Given-blok, bijvoorbeeld {} := 1 => {}: give {} an initial guess above the Given block first, for example {} := 1
+{}: geen oplossing gevonden (restfout {}); probeer andere startwaarden => {}: no solution found (residual {}); try other initial guesses
+{}: het aantal moet een geheel getal van 1 tot en met 1000000 zijn => {}: the number must be a whole number from 1 to 1000000
+{}: het aantal punten moet een geheel getal van 1 tot en met 100000 zijn => {}: the number of points must be a whole number from 1 to 100000
+{}: noem de onbekenden, bijvoorbeeld {}(x, y) => {}: name the unknowns, for example {}(x, y)
+
+# symbolic
+de afgeleide van {} is (nog) niet symbolisch bekend => the derivative of {} is not known symbolically (yet)
+deze uitdrukking kan niet symbolisch worden afgeleid => this expression cannot be differentiated symbolically
+een veelterm van graad {}: gebruik polyroots of root => a polynomial of degree {}: use polyroots or root
+eigen functies roepen elkaar te diep aan om symbolisch uit te schrijven => your own functions call each other too deeply to write out symbolically
+geen reële oplossingen (de discriminant is negatief) => no real solutions (the discriminant is negative)
+limit: geen limiet gevonden voor {} → {} => limit: no limit found for {} → {}
+limit: geen limiet gevonden voor {} → {} (na zes keer l'Hôpital) => limit: no limit found for {} → {} (after six applications of l'Hôpital)
+limit: geen limiet gevonden voor {} → ∞ => limit: no limit found for {} → ∞
+limit: oneindig of bestaat niet voor {} → {} => limit: infinite or does not exist for {} → {}
+limit: oneindig voor {} → {}∞ => limit: infinite for {} → {}∞
+{} kan niet symbolisch worden vrijgemaakt; gebruik root of een solve block => {} cannot be isolated symbolically; use root or a solve block
+{} komt niet voor in de vergelijking => {} does not occur in the equation
+
+# plots and sweeps
+grafiek-syntax: plot x = begin ; einde : f(x), g(x)  of  plot vx : vy => plot syntax: plot x = start ; end : f(x), g(x)  or  plot vx : vy
+plot: alle reeksen op de {} moeten dezelfde eenheid hebben => plot: all series on the {} must have the same unit
+plot: alle x-waarden moeten dezelfde eenheid hebben => plot: all x values must have the same unit
+plot: bij polar is de x-variabele een hoek (zonder eenheid, in radialen) => plot: with polar the x variable is an angle (without a unit, in radians)
+plot: de eenheid van de y-as is 0 => plot: the unit of the y-axis is 0
+plot: de naam van de x-variabele is ongeldig => plot: the name of the x variable is invalid
+plot: een grens schrijf je als 'x = begin ; einde' => plot: write a limit as 'x = start ; end'
+plot: een logaritmische x-as vraagt een begin en einde groter dan 0 => plot: a logarithmic x-axis needs a start and end greater than 0
+plot: een logaritmische {}-as kan niet bij 0 of lager beginnen => plot: a logarithmic {}-axis cannot start at 0 or lower
+plot: een oppervlak heeft één functie: plot x = a ; b, y = c ; d : f(x, y) => plot: a surface has one function: plot x = a ; b, y = c ; d : f(x, y)
+plot: een oppervlak vraagt twee bereiken: plot x = a ; b, y = c ; d : f(x, y) => plot: a surface needs two ranges: plot x = a ; b, y = c ; d : f(x, y)
+plot: geen enkel punt uit te rekenen => plot: no point could be calculated
+plot: het aantal punten moet een geheel getal van 2 tot en met {} zijn => plot: the number of points must be a whole number from 2 to {}
+plot: het bereik heeft meer dan 100000 waarden => plot: the range has more than 100000 values
+plot: hooguit twee groepen reeksen (links en rechts), gescheiden door ';' => plot: at most two groups of series (left and right), separated by ';'
+plot: lege reeks (twee komma's achter elkaar?) => plot: empty series (two commas in a row?)
+plot: polar hoort bij een gewone grafiek met één y-as => plot: polar belongs to a plain plot with one y-axis
+plot: {} moet een reële vector zijn, geen {} => plot: {} must be a real vector, not a {}
+plot: {}: het begin moet kleiner zijn dan het einde => plot: {}: the start must be smaller than the end
+sweep-syntax: sweep naam = begin ; einde ; aantal : uitdrukking = => sweep syntax: sweep name = start ; end ; count : expression =
+sweep: de naam van de sweepvariabele is ongeldig => sweep: the name of the sweep variable is invalid
+sweep: het aantal punten moet een geheel getal van 2 tot en met 500 zijn => sweep: the number of points must be a whole number from 2 to 500
+sweep: na de ':' moet een resultaatregel staan, bijvoorbeeld 'x^2 =' => sweep: a result line must follow the ':', for example 'x^2 ='
+✗ een bereikvariabele in een sweep wordt niet ondersteund => ✗ a range variable in a sweep is not supported
+✗ geen resultaatregel => ✗ no result line
+{} reeks(en) × {} punten, {} van {} tot {} (tekening: mathprime-cli export of de grafische versie) => {} series × {} points, {} from {} to {} (drawing: mathprime-cli export or the graphical version)
+
+# files
+alleen PNG-afbeeldingen worden ondersteund => only PNG images are supported
+de afbeelding is beschadigd (geen geldige base64) => the image is damaged (no valid base64)
+geen geldig Excel-bestand (.xlsx) => not a valid Excel file (.xlsx)
+geen waarden => no values
+geen werkbladen => no worksheets
+het bestand bevat geen getallen => the file contains no numbers
+kan {} niet lezen: {} => cannot read {}: {}
+kan {} niet schrijven: {} => cannot write {}: {}
+relaties ontbreken => relationships are missing
+werkblad '{}' bestaat niet => worksheet '{}' does not exist
+werkblad niet gevonden => worksheet not found
+werkblad zonder relatie => worksheet without a relationship
+xl/workbook.xml ontbreekt => xl/workbook.xml is missing
+{} is geen tekencode => {} is not a character code
+
+# added by the completeness test
+verwacht 0 ≤ k ≤ n => expected 0 ≤ k ≤ n
+{} is een temperatuurschaal met een nulpunt: zet er een getal voor (20 {}), of gebruik Δ{} voor een temperatuurverschil => {} is a temperature scale with a zero point: put a number in front of it (20 {}), or use Δ{} for a temperature difference
+{} van {} => {} of {}
+rechts van '=' staat een getal. Gebruik ':=' om een waarde toe te kennen, of zet er een eenheid neer (bijvoorbeeld '= kN') => there is a number right of '='. Use ':=' to assign a value, or put a unit there (for example '= kN')
+bij {}: {} => in {}: {}
+dit resultaat heeft {} rijen; hoogstens {} kunnen getoond worden. Maak het bereik kleiner, of definieer er een vector mee (y := ...) => this result has {} rows; at most {} can be shown. Make the range smaller, or define a vector with it (y := ...)
+de tekst wordt niet afgesloten met '"' => the text is not closed with '"'
+de eenheden in deze matrix passen niet bij elkaar (element (i, j) moet de eenheid 'rij i' × 'kolom j' hebben) => the units in this matrix do not match (element (i, j) must have the unit 'row i' × 'column j')
+de integraal convergeert niet (te veel functie-evaluaties); controleer of de functie ergens oneindig wordt => the integral does not converge (too many function evaluations); check whether the function becomes infinite somewhere
+sum(uitdrukking, i, van, tot) => sum(expression, i, from, to)
+prod(uitdrukking, i, van, tot) => prod(expression, i, from, to)
+voor '{' hoort 'naam :=' of 'f(x) :=' => 'name :=' or 'f(x) :=' belongs before '{'
+na 'substitute, x' hoort '= waarde' => '= value' belongs after 'substitute, x'
+na 'limit, x' hoort '= punt', zoals 'limit, x = 0' of 'limit, x = ∞' => '= point' belongs after 'limit, x', such as 'limit, x = 0' or 'limit, x = ∞'
+een bereikvariabele (zoals i := 1..10) kan hier niet als geheel worden gebruikt; gebruik hem in een resultaatregel, een definitie of als index => a range variable (such as i := 1..10) cannot be used as a whole here; use it in a result line, a definition or as an index
+kan een {} matrix niet met een {} matrix vermenigvuldigen (het aantal kolommen links moet gelijk zijn aan het aantal rijen rechts) => cannot multiply a {} matrix by a {} matrix (the number of columns on the left must equal the number of rows on the right)
+Find: geen oplossing gevonden (grootste relatieve restfout {}); probeer andere startwaarden, of Minerr voor de beste benadering => Find: no solution found (largest relative residual {}); try other initial guesses, or Minerr for the best approximation
+'{}' is hier nog niet gedefinieerd (wel op regel {}, verderop in het blad). Zet de definitie boven deze regel => '{}' is not defined here yet (it is on line {}, further down the sheet). Put the definition above this line
+het eerste argument is de bestandsnaam, als tekst: "metingen.csv" => the first argument is the file name, as text: "metingen.csv"
+{} ontbreekt => {} is missing
+plot: na '=' hoort één eenheid, bijvoorbeeld '= mm' => plot: one unit belongs after '=', for example '= mm'
+een y-vector => a y vector
+
+# status bar of the program
+{} van {} regio's herberekend in {} ms => {} of {} regions recalculated in {} ms
+Hele blad ({} regio's) doorgerekend in {} ms => Whole sheet ({} regions) calculated in {} ms
+Doorgerekend in {} ms => Calculated in {} ms
+Uit Mathcad ingelezen: {} regio's, {} niet overgenomen (staan als grijze notitie op hun plek), {} met een fout => Read from Mathcad: {} regions, {} not taken over (they are a grey note in their place), {} with an error
+Geëxporteerd: {} => Exported: {}
+Exporteren mislukt: {} => Export failed: {}
+Opgeslagen als Mathcad: {} ({} regio's als tekst, zie het lijstje) => Saved as Mathcad: {} ({} regions as text, see the list)
+Opgeslagen als Mathcad: {} => Saved as Mathcad: {}
+Opgeslagen: {} => Saved: {}
+Opslaan mislukt: {} => Saving failed: {}
+Naar de printer gestuurd (via de PDF-lezer) => Sent to the printer (via the PDF reader)
+De PDF-lezer kan niet direct afdrukken; de PDF staat open om daar af te drukken => The PDF reader cannot print directly; the PDF is open so you can print it there
+Afdrukken mislukt: {} => Printing failed: {}
+Aangemaakt: {} => Created: {}
+Kan {} niet aanmaken: {} => Cannot create {}: {}
+Kan {} niet openen: {} => Cannot open {}: {}
+Kan {} niet inlezen: {} => Cannot read {}: {}
+Kan {} niet lezen: {} => Cannot read {}: {}
+Kan {} niet opslaan: {} => Cannot save {}: {}
+{} kan niet geopend worden (wel: .rkn, .mcdx, .png) => {} cannot be opened (these can: .rkn, .mcdx, .png)
+Niets meer ongedaan te maken => Nothing left to undo
+Grafiek: plot x = begin ; eind : f(x), g(x)   (Enter om te tekenen) => Plot: plot x = start ; end : f(x), g(x)   (Enter to draw)
+Solve block: typ de vergelijkingen eronder (Ctrl+= voor ==), sluit af met Find(x) = => Solve block: type the equations below it (Ctrl+= for ==), finish with Find(x) =
+Pagina-einde: wat eronder staat, begint op een nieuwe pagina => Page break: what is below it starts on a new page
+Gebied: klik op ▾ om in of uit te klappen; klik op de titel om hem te wijzigen => Area: click ▾ to collapse or expand; click the title to change it
+Kop- en voettekst staan op elke pagina; {pagina}, {paginas}, {bestand} en {datum} worden ingevuld => Header and footer are on every page; {pagina}, {paginas}, {bestand} and {datum} are filled in
+Tabel: bovenaan de namen, daaronder de eenheden; Tab naar de volgende cel, Enter een rij lager, Esc klaar => Table: names at the top, units below them; Tab to the next cell, Enter one row down, Esc when done
+Regio's gescheiden => Regions separated
+Alleen PNG-afbeeldingen kunnen worden ingevoegd => Only PNG images can be inserted
+Afbeelding ingevoegd: {} => Image inserted: {}
+'{}' is geen geldige naam => '{}' is not a valid name
+'{}' hernoemd naar '{}' in {} regio('s) => '{}' renamed to '{}' in {} region(s)
+{} regio('s) aangepast => {} region(s) changed
+{} blad(en) hersteld; sla ze op om ze te bewaren => {} sheet(s) restored; save them to keep them
+Shift+Enter voegt een rij toe in een matrix of een regel in een programma => Shift+Enter adds a row in a matrix or a line in a program
+Shift+Spatie voegt een kolom toe in een matrix => Shift+Space adds a column in a matrix
+deze regio heeft al := , = of → => this region already has := , = or →
+deze regio heeft al := of = => this region already has := or =
+dit teken heeft hier (nog) geen betekenis => this character has no meaning here (yet)

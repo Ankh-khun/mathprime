@@ -484,3 +484,24 @@ fn tabel_definieert_kolommen() {
     assert!(sheet.render().contains("tabel x [mm], F [kN] {"), "{}", sheet.render());
     assert_eq!(sheet.output(1), &Output::Value("2.5 kN".into()));
 }
+
+#[test]
+fn foutmeldingen_in_het_engels() {
+    // de echte meldingen van een blad door de vertaling (de vlag zelf is proces-breed, dus hier niet gezet)
+    let cases = [
+        ("a := 1 m + 1 s\n", "units do not match"),
+        ("b := nietbestaand + 1\n", "unknown name 'nietbestaand'"),
+        ("c := 1 / 0\nc =\n", "division by zero"),
+        ("d := 1\ne := d(1)\n", "'d' is not a function"),
+        ("f := pmt(1)\n", "pmt expects 3 to 5 argument(s), but got 1"),
+        ("g := [1, 2] * [1, 2]\n", "cannot multiply a 1×2 matrix by a 1×2 matrix"),
+    ];
+    for (src, _) in &cases {
+        let sheet = Sheet::load(src);
+        assert!(sheet.error_count() > 0, "{src}");
+        let dutch = sheet.render();
+        let en = rb_units::i18n::translate(dutch.lines().find(|l| l.contains('✗')).expect("fout").trim_start_matches([' ', '✗']));
+        let want = cases.iter().find(|(s, _)| s == src).unwrap().1;
+        assert!(en.contains(want), "{src}: {en}");
+    }
+}

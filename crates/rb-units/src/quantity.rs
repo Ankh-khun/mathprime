@@ -25,30 +25,27 @@ pub enum UnitError {
 
 impl fmt::Display for UnitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            UnitError::Mismatch { op, left, right } => write!(
-                f,
+        let text = match self {
+            UnitError::Mismatch { op, left, right } => format!(
                 "eenheden komen niet overeen bij {op}: {} en {}",
                 left.describe(),
                 right.describe()
             ),
-            UnitError::NotDimensionless { what, dim } => write!(
-                f,
+            UnitError::NotDimensionless { what, dim } => format!(
                 "{what} moet dimensieloos zijn, maar heeft eenheid {}",
                 dim.describe()
             ),
-            UnitError::NonIntegerPower { dim } => write!(
-                f,
+            UnitError::NonIntegerPower { dim } => format!(
                 "een grootheid met eenheid {} kan alleen tot een geheel getal (of een wortelmacht 1/n) worden verheven",
                 dim.describe()
             ),
-            UnitError::NoRoot { dim, n } => write!(
-                f,
+            UnitError::NoRoot { dim, n } => format!(
                 "kan geen {n}e-machtswortel nemen van eenheid {}",
                 dim.describe()
             ),
-            UnitError::Overflow => write!(f, "eenheidsexponenten worden te groot"),
-        }
+            UnitError::Overflow => "eenheidsexponenten worden te groot".to_string(),
+        };
+        f.write_str(&crate::i18n::tr(&text))
     }
 }
 

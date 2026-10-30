@@ -33,17 +33,16 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Lex { msg, .. } | Error::Parse { msg, .. } => write!(f, "{msg}"),
-            Error::Unit(e) => write!(f, "{e}"),
-            Error::Unknown(n) => write!(f, "onbekende naam '{n}' (geen variabele, functie, constante of eenheid)"),
-            Error::NotAFunction(n) => write!(f, "'{n}' is geen functie"),
-            Error::Arity { name, expected, got } => {
-                write!(f, "{name} verwacht {expected} argument(en), maar kreeg er {got}")
-            }
-            Error::Domain(m) => write!(f, "{m}"),
-            Error::Depth => write!(f, "functieaanroepen zijn te diep geneest (recursie zonder einde?)"),
-        }
+        let text = match self {
+            Error::Lex { msg, .. } | Error::Parse { msg, .. } => msg.clone(),
+            Error::Unit(e) => e.to_string(),
+            Error::Unknown(n) => format!("onbekende naam '{n}' (geen variabele, functie, constante of eenheid)"),
+            Error::NotAFunction(n) => format!("'{n}' is geen functie"),
+            Error::Arity { name, expected, got } => format!("{name} verwacht {expected} argument(en), maar kreeg er {got}"),
+            Error::Domain(m) => m.clone(),
+            Error::Depth => "functieaanroepen zijn te diep geneest (recursie zonder einde?)".to_string(),
+        };
+        f.write_str(&rb_units::i18n::tr(&text))
     }
 }
 

@@ -380,7 +380,9 @@ impl App {
     }
 
     pub(crate) fn guarded(&mut self, ctx: &egui::Context, p: Pending) {
-        if self.dirty {
+        // wat nog in de bewerker staat, telt mee
+        self.commit(false);
+        if self.unsaved() {
             self.pending = Some(p);
         } else {
             self.finish(ctx, p);
@@ -810,6 +812,8 @@ impl eframe::App for App {
         }
         // bij een schermafdruk voor tests niet om opslaan vragen
         if ctx.input(|i| i.viewport().close_requested()) && !self.allow_close && self.shot.is_none() {
+            // wat nog in de bewerker staat, telt mee (anders gaat het zonder vraag verloren)
+            self.commit(false);
             // een tabblad met wijzigingen: daarheen en vragen (daarna de volgende)
             if let Some(i) = self.first_dirty_tab() {
                 ctx.send_viewport_cmd(ViewportCommand::CancelClose);
@@ -817,7 +821,7 @@ impl eframe::App for App {
                 self.pending = Some(Pending::Sluiten);
             }
         }
-        let title = format!("{}{} — MathPrime", if self.dirty { "• " } else { "" }, self.file_name());
+        let title = format!("{}{} — MathPrime", if self.unsaved() { "• " } else { "" }, self.file_name());
         if title != self.title {
             ctx.send_viewport_cmd(ViewportCommand::Title(title.clone()));
             self.title = title;
@@ -869,7 +873,7 @@ impl eframe::App for App {
                     ui.label(RichText::new(format!("{} {}", crate::icons::OK, crate::taal::nl_en("Geen fouten", "No errors"))).color(green));
                 }
                 ui.add_space(8.0);
-                ui.label(RichText::new(format!("{n} {}  ·  {}", crate::taal::nl_en("regio's", "regions"), self.status)).weak());
+                ui.label(RichText::new(format!("{n} {}  ·  {}", crate::taal::nl_en("regio's", "regions"), rb_units::i18n::tr(&self.status))).weak());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let plain = |s: String| egui::Button::new(RichText::new(s).size(14.0)).frame_when_inactive(false);
                     if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text(t("Groter (Ctrl+wiel)")).clicked() {

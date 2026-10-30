@@ -6,6 +6,7 @@
 mod dim;
 mod format;
 mod quantity;
+pub mod i18n;
 pub mod table;
 
 pub use dim::{Dim, NDIM};

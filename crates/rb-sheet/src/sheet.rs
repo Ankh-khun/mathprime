@@ -42,7 +42,7 @@ impl Cached {
 
     fn error(message: String, col: Option<usize>) -> Cached {
         Cached {
-            output: Output::Error { message, col },
+            output: Output::Error { message: rb_units::i18n::tr(&message), col },
             defined: Vec::new(),
             result: None,
         }

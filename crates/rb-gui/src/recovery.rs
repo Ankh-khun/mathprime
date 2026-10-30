@@ -92,7 +92,7 @@ impl App {
         }
         for (id, path, source, dirty) in docs {
             let file = dir.join(format!("{id}.herstel"));
-            if dirty {
+            if crate::tabs::needs_save(dirty, &source, path.as_deref(), None) {
                 let _ = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&file, encode(path.as_deref(), &source)));
             } else {
                 let _ = std::fs::remove_file(&file);

@@ -314,9 +314,11 @@ impl App {
             let digits_changed = s.digits != before.digits;
             let language_changed = s.english != before.english;
             crate::taal::set_english(s.english);
+            rb_units::i18n::set_english(s.english);
             self.cv.set = s;
             if language_changed {
                 self.load_library();
+                self.reload();
             }
             self.apply_theme(ctx);
             if digits_changed {

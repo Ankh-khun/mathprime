@@ -1674,6 +1674,7 @@ impl App {
         self.cv.dark = self.cv.set.thema == crate::settings::Thema::Donker;
         rb_units::set_significant_digits(self.cv.set.digits);
         crate::taal::set_english(self.cv.set.english);
+        rb_units::i18n::set_english(self.cv.set.english);
     }
 
     pub(crate) fn save_settings(&mut self) {

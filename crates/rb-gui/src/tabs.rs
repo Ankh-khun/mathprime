@@ -29,7 +29,17 @@ pub(crate) struct DocState {
     pub id: u64,
 }
 
+/// Moet dit blad bewaard worden? Een naamloos blad zonder inhoud niet, ook niet als er iets getypt en weer
+/// gewist is.
+pub(crate) fn needs_save(dirty: bool, source: &str, path: Option<&std::path::Path>, import_name: Option<&str>) -> bool {
+    dirty && !(source.trim().is_empty() && path.is_none() && import_name.is_none())
+}
+
 impl DocState {
+    fn unsaved(&self) -> bool {
+        needs_save(self.dirty, &self.source, self.path.as_deref(), self.import_name.as_deref())
+    }
+
     pub fn empty(base_dir: PathBuf, id: u64) -> DocState {
         DocState {
             source: String::new(),
@@ -166,20 +176,25 @@ impl App {
         self.title.clear();
     }
 
+    /// Heeft het actieve blad wijzigingen die bewaard moeten worden?
+    pub(crate) fn unsaved(&self) -> bool {
+        needs_save(self.dirty, &self.source, self.path.as_deref(), self.import_name.as_deref())
+    }
+
     /// Het eerste tabblad met niet-opgeslagen wijzigingen.
     pub(crate) fn first_dirty_tab(&self) -> Option<usize> {
-        if self.dirty {
+        if self.unsaved() {
             return Some(self.active);
         }
-        (0..self.tabs.len()).find(|&i| i != self.active && self.tabs[i].dirty)
+        (0..self.tabs.len()).find(|&i| i != self.active && self.tabs[i].unsaved())
     }
 
     /// De naam van tabblad `i`, met • als er iets niet is opgeslagen.
     fn tab_label(&self, i: usize) -> (String, bool) {
         if i == self.active {
-            (self.file_name(), self.dirty)
+            (self.file_name(), self.unsaved())
         } else {
-            (self.tabs[i].name(), self.tabs[i].dirty)
+            (self.tabs[i].name(), self.tabs[i].unsaved())
         }
     }
 
@@ -259,5 +274,23 @@ impl App {
     fn tab_path(&self, i: usize) -> String {
         let p = if i == self.active { self.path.as_ref() } else { self.tabs[i].path.as_ref() };
         p.map_or("Nog niet opgeslagen".to_string(), |p| p.display().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::needs_save;
+    use std::path::Path;
+
+    #[test]
+    fn leeg_blad_hoeft_niet_bewaard() {
+        // leeg of alleen witruimte, naamloos: geen vraag, ook niet na typen en wissen
+        assert!(!needs_save(true, "", None, None));
+        assert!(!needs_save(true, " \n", None, None));
+        assert!(!needs_save(false, "a := 1", None, None));
+        assert!(needs_save(true, "a := 1", None, None));
+        // een bestaand bestand leeggemaakt, of een import zonder inhoud: wel vragen
+        assert!(needs_save(true, "", Some(Path::new("blad.rkn")), None));
+        assert!(needs_save(true, "", None, Some("blad.rkn")));
     }
 }

@@ -7,20 +7,32 @@ param([switch]$Stil)
 $ErrorActionPreference = "Stop"
 $map = $PSScriptRoot
 Add-Type -AssemblyName System.Windows.Forms
+# Taal: zoals ingesteld in MathPrime, anders die van Windows
+function IsEngels {
+    $inst = Join-Path $env:APPDATA "MathPrime\instellingen.txt"
+    if (Test-Path $inst) {
+        $regel = Get-Content $inst | Where-Object { $_ -match "^\W*taal\s*=" } | Select-Object -First 1
+        if ($regel) { return $regel -match "=\s*en" }
+    }
+    return (Get-UICulture).TwoLetterISOLanguageName -ne "nl"
+}
+$engels = IsEngels
+function T([string]$nl, [string]$en) { if ($engels) { $en } else { $nl } }
+
 
 function Melding([string]$tekst, [string]$soort = "Information") {
     if ($Stil) { Write-Output $tekst; return }
-    [void][System.Windows.Forms.MessageBox]::Show($tekst, "MathPrime verwijderen", "OK", $soort)
+    [void][System.Windows.Forms.MessageBox]::Show($tekst, (T "MathPrime verwijderen" "Uninstall MathPrime"), "OK", $soort)
 }
 
 try {
     $exe = Join-Path $map "mathprime.exe"
     if (Get-Process mathprime -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }) {
-        Melding "MathPrime is nog geopend. Sla je werk op, sluit MathPrime en probeer het opnieuw." "Warning"
+        Melding (T "MathPrime is nog geopend. Sla je werk op, sluit MathPrime en probeer het opnieuw." "MathPrime is still open. Save your work, close MathPrime and try again.") "Warning"
         exit 1
     }
     if (-not $Stil) {
-        $ok = [System.Windows.Forms.MessageBox]::Show("MathPrime verwijderen? Je werkbladen en instellingen blijven bewaard.", "MathPrime verwijderen", "YesNo", "Question")
+        $ok = [System.Windows.Forms.MessageBox]::Show((T "MathPrime verwijderen? Je werkbladen en instellingen blijven bewaard." "Uninstall MathPrime? Your worksheets and settings are kept."), (T "MathPrime verwijderen" "Uninstall MathPrime"), "YesNo", "Question")
         if ($ok -ne "Yes") { exit 0 }
     }
 
@@ -48,9 +60,9 @@ try {
 
     Set-Location $env:TEMP
     Remove-Item $map -Recurse -Force
-    Melding "MathPrime is verwijderd."
+    Melding (T "MathPrime is verwijderd." "MathPrime has been uninstalled.")
 }
 catch {
-    Melding "Verwijderen is niet helemaal gelukt:`n$($_.Exception.Message)" "Error"
+    Melding ((T "Verwijderen is niet helemaal gelukt:" "Uninstalling did not fully succeed:") + "`n$($_.Exception.Message)") "Error"
     exit 1
 }

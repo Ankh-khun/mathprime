@@ -17,12 +17,13 @@ pub enum Issue {
 
 impl Issue {
     pub fn message(&self) -> String {
-        match self {
+        let text = match self {
             Issue::UsedBeforeDefined { name, defined_line } => format!(
                 "'{name}' is hier nog niet gedefinieerd (wel op regel {defined_line}, verderop in het blad). \
                  Zet de definitie boven deze regel"
             ),
-        }
+        };
+        rb_units::i18n::tr(&text)
     }
 }
 

@@ -24,6 +24,18 @@ $bron = $PSScriptRoot
 $versie = (Get-Content (Join-Path $bron "versie.txt") -ErrorAction SilentlyContinue | Select-Object -First 1)
 if (-not $versie) { $versie = "onbekend" }
 Add-Type -AssemblyName System.Windows.Forms
+# Taal: zoals ingesteld in MathPrime, anders die van Windows
+function IsEngels {
+    $inst = Join-Path $env:APPDATA "MathPrime\instellingen.txt"
+    if (Test-Path $inst) {
+        $regel = Get-Content $inst | Where-Object { $_ -match "^\W*taal\s*=" } | Select-Object -First 1
+        if ($regel) { return $regel -match "=\s*en" }
+    }
+    return (Get-UICulture).TwoLetterISOLanguageName -ne "nl"
+}
+$engels = IsEngels
+function T([string]$nl, [string]$en) { if ($engels) { $en } else { $nl } }
+
 
 function Melding([string]$tekst, [string]$soort = "Information") {
     if ($Stil) { Write-Output $tekst; return }
@@ -35,7 +47,7 @@ try {
     $exe = Join-Path $Doel "mathprime.exe"
     $draait = Get-Process mathprime -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
     if ($draait) {
-        Melding "MathPrime is nog geopend. Sla je werk op, sluit MathPrime en start de installatie opnieuw." "Warning"
+        Melding (T "MathPrime is nog geopend. Sla je werk op, sluit MathPrime en start de installatie opnieuw." "MathPrime is still open. Save your work, close MathPrime and start the installation again.") "Warning"
         exit 1
     }
 
@@ -51,7 +63,7 @@ try {
         New-Item -ItemType Directory -Force $vm | Out-Null
         foreach ($v in $voorbeelden) { Copy-Item $v.FullName (Join-Path $vm ($v.Name -replace "^voorbeeld_", "")) -Force }
     }
-    if ($AlleenBestanden) { Melding "Bestanden gekopieerd naar $Doel"; exit 0 }
+    if ($AlleenBestanden) { Melding (T "Bestanden gekopieerd naar $Doel" "Files copied to $Doel"); exit 0 }
 
     # snelkoppelingen
     $shell = New-Object -ComObject WScript.Shell
@@ -63,7 +75,7 @@ try {
         $s.TargetPath = $exe
         $s.WorkingDirectory = [Environment]::GetFolderPath("MyDocuments")
         $s.IconLocation = "$exe,0"
-        $s.Description = "MathPrime - rekenblad met eenheden"
+        $s.Description = (T "MathPrime - rekenblad met eenheden" "MathPrime - worksheet with units")
         $s.Save()
     }
 
@@ -109,13 +121,13 @@ try {
     Add-Type -Namespace MathPrime -Name Shell -MemberDefinition '[DllImport("shell32.dll")] public static extern void SHChangeNotify(int e, int f, System.IntPtr a, System.IntPtr b);'
     [MathPrime.Shell]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
 
-    if ($Stil) { Write-Output "MathPrime $versie geïnstalleerd in $Doel"; exit 0 }
+    if ($Stil) { Write-Output (T "MathPrime $versie geïnstalleerd in $Doel" "MathPrime $versie installed in $Doel"); exit 0 }
     $antwoord = [System.Windows.Forms.MessageBox]::Show(
-        "MathPrime $versie is geïnstalleerd.`n`nJe vindt het in het Startmenu en op het bureaublad; .rkn-bestanden openen met een dubbelklik. Verwijderen kan via Instellingen > Apps.`n`nMathPrime nu starten?",
+        (T "MathPrime $versie is geïnstalleerd.`n`nJe vindt het in het Startmenu en op het bureaublad; .rkn-bestanden openen met een dubbelklik. Verwijderen kan via Instellingen > Apps.`n`nMathPrime nu starten?" "MathPrime $versie is installed.`n`nYou will find it in the Start menu and on the desktop; .rkn files open with a double-click. Uninstall via Settings > Apps.`n`nStart MathPrime now?"),
         "MathPrime $versie", "YesNo", "Information")
     if ($antwoord -eq "Yes") { Start-Process $exe }
 }
 catch {
-    Melding "De installatie is mislukt:`n$($_.Exception.Message)" "Error"
+    Melding ((T "De installatie is mislukt:" "The installation failed:") + "`n$($_.Exception.Message)") "Error"
     exit 1
 }
