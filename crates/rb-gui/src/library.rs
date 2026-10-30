@@ -103,8 +103,8 @@ pub fn load_own(dir: &Path) -> Vec<Formula> {
     std::fs::read_to_string(dir.join("formules.txt")).map(|t| parse(&t, true)).unwrap_or_default()
 }
 
-/// Schrijf de eigen formules (per categorie).
-pub fn save_own(dir: &Path, own: &[Formula]) -> std::io::Result<()> {
+/// Formules als tekst (per categorie): het formaat van `formules.txt` en van een bibliotheekbestand.
+pub fn to_text(own: &[Formula]) -> String {
     let mut text = String::from("# Eigen formules voor MathPrime: naam | vergelijking | grootheid: omschrijving [eenheid]; ...\n");
     let mut cats: Vec<&str> = own.iter().map(|f| f.category.as_str()).collect();
     cats.dedup();
@@ -119,8 +119,57 @@ pub fn save_own(dir: &Path, own: &[Formula]) -> std::io::Result<()> {
             text.push('\n');
         }
     }
+    text
+}
+
+/// Schrijf de eigen formules.
+pub fn save_own(dir: &Path, own: &[Formula]) -> std::io::Result<()> {
     std::fs::create_dir_all(dir)?;
-    std::fs::write(dir.join("formules.txt"), text)
+    std::fs::write(dir.join("formules.txt"), to_text(own))
+}
+
+/// Een geïmporteerde bibliotheek: een bestand met formules in `bibliotheken` in de instellingenmap.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pack {
+    pub name: String,
+    pub formulas: Vec<Formula>,
+}
+
+/// De bibliotheken, op naam. De categorieën krijgen de naam van de bibliotheek ervoor.
+pub fn load_packs(dir: &Path) -> Vec<Pack> {
+    let mut out: Vec<Pack> = std::fs::read_dir(dir.join("bibliotheken"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| {
+            let name = e.path().file_stem()?.to_string_lossy().into_owned();
+            let mut formulas = parse(&std::fs::read_to_string(e.path()).ok()?, false);
+            for f in &mut formulas {
+                f.category = format!("{name}: {}", f.category);
+            }
+            Some(Pack { name, formulas })
+        })
+        .collect();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    out
+}
+
+/// Neem een bibliotheekbestand over; geeft het aantal formules. Een bestand zonder geldige formules wordt geweigerd.
+pub fn import_pack(dir: &Path, file: &Path) -> Result<usize, String> {
+    let text = std::fs::read_to_string(file).map_err(|e| e.to_string())?;
+    let n = parse(&text, false).len();
+    if n == 0 {
+        return Err(crate::taal::nl_en("geen formules gevonden in dit bestand", "no formulas found in this file").to_string());
+    }
+    let name = file.file_name().ok_or("geen bestandsnaam")?;
+    let target = dir.join("bibliotheken");
+    std::fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    std::fs::write(target.join(name), text).map_err(|e| e.to_string())?;
+    Ok(n)
+}
+
+pub fn remove_pack(dir: &Path, name: &str) -> std::io::Result<()> {
+    std::fs::remove_file(dir.join("bibliotheken").join(format!("{name}.txt")))
 }
 
 /// De vergelijking van een regio (`a == b`, of een definitie `a := b`), als die er een is.
@@ -224,6 +273,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn bibliotheek_importeren_en_verwijderen() {
+        let dir = std::env::temp_dir().join(format!("mathprime-bib-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let own = parse("## Mijn\nProef | a == b * c | a: uitkomst [N]; b: eerste [N]; c: tweede [1]\n", true);
+        let file = dir.join("staal.txt");
+        std::fs::write(&file, to_text(&own)).unwrap();
+        assert_eq!(import_pack(&dir, &file), Ok(1));
+        let packs = load_packs(&dir);
+        assert_eq!(packs.len(), 1);
+        assert_eq!(packs[0].name, "staal");
+        assert_eq!(packs[0].formulas[0].category, "staal: Mijn");
+        assert_eq!(packs[0].formulas[0].eq, own[0].eq);
+        assert!(!packs[0].formulas[0].own);
+        // iets dat geen bibliotheek is, wordt geweigerd
+        let bad = dir.join("onzin.txt");
+        std::fs::write(&bad, "hallo\n").unwrap();
+        assert!(import_pack(&dir, &bad).is_err());
+        remove_pack(&dir, "staal").unwrap();
+        assert!(load_packs(&dir).is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// De Engelse bibliotheek heeft dezelfde formules (vergelijkingen, namen en eenheden) als de Nederlandse.
     #[test]
     fn engelse_bibliotheek_gelijk_aan_nederlandse() {
@@ -303,6 +375,7 @@ pub struct LibraryState {
     pub show: bool,
     builtin: Vec<Formula>,
     own: Vec<Formula>,
+    packs: Vec<Pack>,
     search: String,
     with_inputs: bool,
     form: Option<Form>,
@@ -310,7 +383,7 @@ pub struct LibraryState {
 
 impl Default for LibraryState {
     fn default() -> Self {
-        LibraryState { show: false, builtin: builtin(), own: Vec::new(), search: String::new(), with_inputs: true, form: None }
+        LibraryState { show: false, builtin: builtin(), own: Vec::new(), packs: Vec::new(), search: String::new(), with_inputs: true, form: None }
     }
 }
 
@@ -338,6 +411,7 @@ impl App {
         self.lib.builtin = builtin();
         if let Some(d) = self.library_dir() {
             self.lib.own = load_own(&d);
+            self.lib.packs = load_packs(&d);
         }
     }
 
@@ -362,9 +436,10 @@ impl App {
             let eq = self.current_equation().map(|(l, r)| format!("{} == {}", rb_edit::convert::expr_text(&l), rb_edit::convert::expr_text(&r))).unwrap_or_default();
             self.lib.form = Some(Form { name: String::new(), category: t("Eigen formules").into(), eq, vars: String::new(), error: None });
         }
+        self.library_packs(ui);
         ui.separator();
         let q = self.lib.search.to_lowercase();
-        let all: Vec<Formula> = self.lib.own.iter().chain(&self.lib.builtin).cloned().collect();
+        let all: Vec<Formula> = self.lib.own.iter().chain(self.lib.packs.iter().flat_map(|p| &p.formulas)).chain(&self.lib.builtin).cloned().collect();
         let matches = |f: &Formula| {
             q.is_empty()
                 || f.name.to_lowercase().contains(&q)
@@ -425,6 +500,45 @@ impl App {
                 self.save_library();
             }
             None => {}
+        }
+    }
+
+    /// Bibliotheken importeren, exporteren en verwijderen.
+    fn library_packs(&mut self, ui: &mut egui::Ui) {
+        let Some(dir) = self.library_dir() else { return };
+        ui.horizontal(|ui| {
+            if ui.button(t("Bibliotheek importeren…")).on_hover_text(t("Een tekstbestand met formules, zoals je met Exporteren maakt")).clicked() {
+                if let Some(p) = rfd::FileDialog::new().add_filter("MathPrime library", &["txt"]).pick_file() {
+                    self.status = match import_pack(&dir, &p) {
+                        Ok(n) => format!("{} {n}", crate::taal::nl_en("Bibliotheek geïmporteerd, formules:", "Library imported, formulas:")),
+                        Err(e) => format!("{}: {e}", p.display()),
+                    };
+                    self.lib.packs = load_packs(&dir);
+                }
+            }
+            if ui.add_enabled(!self.lib.own.is_empty(), egui::Button::new(t("Eigen formules exporteren…"))).clicked() {
+                if let Some(p) = rfd::FileDialog::new().set_file_name("my-formulas.txt").add_filter("MathPrime library", &["txt"]).save_file() {
+                    self.status = match std::fs::write(&p, to_text(&self.lib.own)) {
+                        Ok(()) => format!("Opgeslagen: {}", p.display()),
+                        Err(e) => format!("Kan {} niet opslaan: {e}", p.display()),
+                    };
+                }
+            }
+        });
+        let mut remove = None;
+        for pack in &self.lib.packs {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(format!("{} ({})", pack.name, pack.formulas.len())).small());
+                if ui.small_button("🗑").on_hover_text(t("Uit de bibliotheek verwijderen")).clicked() {
+                    remove = Some(pack.name.clone());
+                }
+            });
+        }
+        if let Some(name) = remove {
+            if let Err(e) = remove_pack(&dir, &name) {
+                self.status = format!("{name}: {e}");
+            }
+            self.lib.packs = load_packs(&dir);
         }
     }
 

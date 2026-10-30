@@ -79,6 +79,8 @@ pub struct App {
     /// Zoeken naar en installeren van een nieuwere versie (update.rs).
     pub(crate) upd: crate::update::State,
     /// De eigen kleurthema's, en het thema dat in het venster gemaakt wordt.
+    /// Ctrl+Shift+F12: de tijd per frame in de statusbalk (gemiddelde en slechtste van de laatste 120).
+    frame_times: Option<std::collections::VecDeque<f32>>,
     pub(crate) own_themes: Vec<crate::theme::Theme>,
     pub(crate) theme_draft: Option<crate::theme::Theme>,
     /// Schermafdruk voor tests (MATHPRIME_SCREENSHOT).
@@ -128,6 +130,7 @@ impl App {
             find: None,
             last_autosave: Instant::now(),
             upd: Default::default(),
+            frame_times: None,
             own_themes: Vec::new(),
             theme_draft: None,
             shot: crate::shot::Shot::from_env(),
@@ -778,6 +781,10 @@ impl eframe::App for App {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = &ui.ctx().clone();
+        let frame_start = Instant::now();
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::F12)) {
+            self.frame_times = if self.frame_times.is_some() { None } else { Some(Default::default()) };
+        }
 
         // een gedownloade nieuwe versie: setup starten en afsluiten (met de gewone vraag om op te slaan)
         if let Some(setup) = self.upd.poll() {
@@ -891,6 +898,13 @@ impl eframe::App for App {
                 }
                 ui.add_space(8.0);
                 ui.label(RichText::new(format!("{n} {}  ·  {}", crate::taal::nl_en("regio's", "regions"), rb_units::i18n::tr(&self.status))).weak());
+                if let Some(times) = &self.frame_times {
+                    if !times.is_empty() {
+                        let mean = times.iter().sum::<f32>() / times.len() as f32;
+                        let worst = times.iter().copied().fold(0.0f32, f32::max);
+                        ui.label(RichText::new(format!("·  frame {mean:.1} ms, max {worst:.1} ms")).weak());
+                    }
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let plain = |s: String| egui::Button::new(RichText::new(s).size(14.0)).frame_when_inactive(false);
                     if ui.add(plain(crate::icons::ZOOM_IN.to_string())).on_hover_text(t("Groter (Ctrl+wiel)")).clicked() {
@@ -941,6 +955,12 @@ impl eframe::App for App {
         self.library_form(ctx);
         if let Some(s) = &mut self.shot {
             s.tick(ctx);
+        }
+        if let Some(times) = &mut self.frame_times {
+            if times.len() >= 120 {
+                times.pop_front();
+            }
+            times.push_back(frame_start.elapsed().as_secs_f32() * 1000.0);
         }
     }
 }

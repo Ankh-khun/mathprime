@@ -17,31 +17,34 @@ Open:
 
 The work happens on the branch `2.0-dev`.
 
+Started so far: the theme engine with built-in and own themes, the title bar in the theme, importing and exporting
+formula libraries, and a frame time display (Ctrl+Shift+F12). Still to do is marked below.
+
 ### Themes
 
 Inspired by the theme system of [Odysseus](https://github.com/odysseus-dev/odysseus): a small palette from which
 everything else is derived, presets, and your own themes as files.
 
 - A theme is five colours: background, text, panel, border, accent. Sheet colours and shades of the ribbon are derived.
-- All fixed colours in `rb-gui` go through the theme; the exported PDF stays black on white.
+- The interface and the sheet follow the theme; the exported PDF stays black on white. To do: the remaining fixed colours (grid, plot lines, error red).
 - Built-in themes named after the arcana.
 - Own themes: pick colours in Settings with a live preview; export and import as a small text file.
-- Later: subtle animated backgrounds, as an option.
+- To do: subtle animated backgrounds, as an option.
 
 ### Title bar in the theme
 
 Replace the standard Windows title bar with our own, in the theme colours: icon, file name, minimise, maximise and
 close buttons, dragging (double-click maximises), and resizing from the edges. Keep Windows snapping working as far as
-the window system allows.
+the window system allows. To do: test dragging, resizing and maximising by hand; this could not be automated.
 
 ### Modular library
 
-One package format for formulas and lookup tables (`.mplib`, plain text so it fits in git):
+One package format for formulas and lookup tables (plain text so it fits in git; today the same format as `formules.txt`, formulas only):
 
 - import other libraries, export your own, extend them;
-- a manager window: which libraries are on, where they came from;
-- the built-in formulas and tables become packages themselves;
-- tables from a package work the same as the built-in ones: `tabel("mypackage/IPE")`.
+- to do: a manager window: which libraries are on, where they came from;
+- to do: the built-in formulas and tables become packages themselves;
+- to do: tables from a package work the same as the built-in ones: `tabel("mypackage/IPE")`.
 
 ### Faster and smoother
 
@@ -49,8 +52,8 @@ Measured in 1.8: a sheet of 486 lines calculates in 0.25 s and a frame costs abo
 bottleneck to fix blindly. The plan is therefore to measure first:
 
 - a frame time overlay for development;
-- benchmarks with large sheets and many plots, in the test suite;
-- then the biggest costs, for example keeping the layout of unchanged regions and repainting less when idle.
+- to do: benchmarks with large sheets and many plots, in the test suite;
+- to do: then the biggest costs, for example keeping the layout of unchanged regions and repainting less when idle.
 
 ## Later
 

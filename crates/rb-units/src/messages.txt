@@ -575,3 +575,4 @@ de onzekerheid is hier niet te bepalen: de functie bestaat niet naast deze waard
 unc werkt niet met een {} => unc does not work with a {}
 een waarde met ± kan (nog) geen element van een matrix zijn => a value with ± cannot be an element of a matrix (yet)
 {} is geen thema => {} is not a theme
+Bibliotheek geïmporteerd, formules: {} => Library imported, formulas: {}

@@ -290,6 +290,9 @@ const VERTALING: &[(&str, &str)] = &[
     ("Zoeken naar updates", "Check for updates"),
     ("Zoeken naar updates…", "Check for updates…"),
     ("wachten op het scherm (na herstarten)", "wait for the display (after restart)"),
+    ("Bibliotheek importeren…", "Import library…"),
+    ("Een tekstbestand met formules, zoals je met Exporteren maakt", "A text file with formulas, as made with Export"),
+    ("Eigen formules exporteren…", "Export own formulas…"),
     // thema's en titelbalk
     ("Kleuren", "Colours"),
     ("Standaard", "Default"),
