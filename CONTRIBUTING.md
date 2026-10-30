@@ -1,39 +1,40 @@
-# Meehelpen aan MathPrime
+# Contributing to MathPrime
 
-Fijn dat je wilt helpen. Een paar afspraken:
+Glad you want to help. A few agreements:
 
-## Bouwen en testen
+## Building and testing
 
 ```powershell
 cargo test --workspace
 cargo run -p rb-gui
 ```
 
-Elke wijziging laat `cargo test --workspace` groen en de release-build zonder warnings
-(`cargo build --release` met `RUSTFLAGS=-D warnings`, zoals de CI op GitHub doet).
+Every change keeps `cargo test --workspace` green and the release build free of warnings (`cargo build --release` with
+`RUSTFLAGS=-D warnings`, as the CI on GitHub does).
 
-Heb je Mathcad Prime-bladen (.mcdx), dan vergelijkt deze test MathPrime met de uitkomsten die Mathcad
-zelf opsloeg:
+If you have Mathcad Prime sheets (.mcdx), this test compares MathPrime with the results Mathcad itself stored:
 
 ```powershell
-$env:MATHPRIME_MCDX_DIRS = "C:\pad\naar\bladen"
+$env:MATHPRIME_MCDX_DIRS = "C:\path\to\sheets"
 cargo test -p rb-mcdx -- --nocapture
 ```
 
-## Regels
+## Rules
 
-- **Geen code of bestanden van PTC.** Alleen het open .mcdx-formaat en de gedocumenteerde Automation
-  API (alleen in `tools/`).
-- **Geen nieuwe crates van buiten** zonder overleg: MathPrime bouwt bewust op een kleine set
-  afhankelijkheden (egui, eframe, egui_plot, miniz_oxide).
-- Code en commentaar zijn in het Nederlands, net als de interface; volg de stijl van de code eromheen.
-- Een nieuwe functie krijgt een test, en een regel in `README.md` en `docs/INVENTARIS.md`.
+- **No code or files from PTC.** Only the open .mcdx format and the documented Automation API (only in `tools/`).
+- **No new external crates** without discussion: MathPrime deliberately builds on a small set of dependencies (egui,
+  eframe, egui_plot, miniz_oxide, rfd).
+- Code and comments are in Dutch; follow the style of the surrounding code. Issues, pull requests and documentation can
+  be in English.
+- A new user-visible message written in the code goes in Dutch, with its translation in
+  `crates/rb-units/src/messages.txt` (a test fails if you forget) or `crates/rb-gui/src/taal.rs` for interface texts.
+- A new function gets a test, and a line in `README.md` and `docs/INVENTORY.md`.
 
-## Indeling
+## Layout
 
-Zie het hoofdstuk "Indeling" in `README.md` en `docs/PLAN.md` voor de opbouw van de crates.
+See the chapter "Layout" in `README.md` for the structure of the crates; the design notes are in `docs/PLAN.md` (Dutch).
 
-## Fouten melden
+## Reporting bugs
 
-Open een issue op GitHub met het werkblad (`.rkn`) of een klein voorbeeld dat het probleem laat zien,
-wat je verwachtte en wat MathPrime gaf.
+Open an issue on GitHub with the worksheet (`.rkn`) or a small example that shows the problem, what you expected and what
+MathPrime gave.

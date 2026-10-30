@@ -14,7 +14,7 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 | rekenkern + eenheden | **klaar in v0.1** | de basis, goed getest |
 | werkblad + herberekening | **klaar in v0.1** (tekstvorm) | posities van regio's sinds v0.2, nog geen grafische layout |
 | taal compleet (fase 1) | **klaar in v0.2** | logica, bereiken, matrices, calculus, complex, temperaturen |
-| functiebibliotheek en oplossers (fase 2) | **klaar in v0.3** | programmablokken, lineaire algebra, verdelingen, regressie, solve blocks, ODE's, FFT; rest zie `INVENTARIS.md` |
+| functiebibliotheek en oplossers (fase 2) | **klaar in v0.3** | programmablokken, lineaire algebra, verdelingen, regressie, solve blocks, ODE's, FFT; rest zie `INVENTORY.md` |
 | grafische interface met formuleweergave (fase 3) | **klaar in v0.4** | grafieken, PDF/SVG |
 | werken zoals Mathcad Prime | **klaar in v0.5** | typen op het werkblad met de toetsen van Prime (`rb-edit`), regio's op A4-pagina's met raster, slepen/selecteren/ongedaan maken, lint met tabbladen; lichte en donkere modus |
 | `.mcdx` openen | **klaar in v0.6** | crate `rb-mcdx`: formules, tekst, grafieken, solve blocks en afbeeldingen; getoetst tegen de uitkomsten die Mathcad in 11 echte bladen bewaarde (107 van 107 gelijk). Alleen lezen. |
@@ -24,7 +24,34 @@ voor één persoon. De lagen verschillen enorm in moeilijkheid:
 
 (S/M/L/XL zijn relatieve maten, geen weken.)
 
-## 2. Wat er nu staat (v1.8)
+## 2. Wat er nu staat (v1.9)
+
+**Nieuw in v1.9.** Uit de Notion-lijst; codenaam Justice (zie `docs/ROADMAP.md`, ook voor 2.0).
+- **Meldingen in het Engels** (`rb-units/src/i18n.rs`, `messages.txt`): de code blijft Nederlandse meldingen schrijven;
+  `tr` zet de hele tekst om met patronen. Wat op `{}` valt wordt zelf ook omgezet, behalve tussen aanhalingstekens
+  (een naam uit het blad). Op één plek: `Display` van `Error` en `UnitError`, `Output::Error`, `Warning::message` en de
+  statusbalk. Een test leest de broncode en faalt op een Nederlandse melding zonder vertaling. De command-line blijft
+  Nederlands. Bij de eerste start volgt de taal Windows (`taal::system_english`).
+- **Installer en verwijderen in het Engels**: `T "nl" "en"` in de scripts; taal uit `instellingen.txt`, anders Windows.
+- **Leeg blad** (`tabs::needs_save`): een naamloos blad zonder inhoud vraagt niets, ook niet na typen en wissen. Bij
+  afsluiten wordt eerst de bewerker afgerond; tekst daarin ging eerder zonder vraag verloren.
+- **Grafieken** (`plot.rs`, `doc.rs`): `| 3d` (`Curve3d`, `curve3d_ops`; kader en lijnstukjes van achter naar voor,
+  draaien als bij een oppervlak) en `| field` (`Field`, `field_ops`; langste pijl één roosterstap, kleur naar grootte).
+- **Opzoektabellen** (`tables.rs`): `Value::Table`, een rij is een tabel met één rij. `IPE("IPE200").Iy` wordt bij het
+  lezen `IPE("IPE200", "Iy")` (token `Tok::Field`, ook met spatie na de punt, want zo schrijft de editor het), dus
+  layout en editor hoefden niets nieuws te leren. Profielen: alleen h, b, tw, tf, r als data; A, I, W en i uit de
+  geometrie met de vier afrondingen (eigen traagheidsmoment 0,0075 r⁴), getest tegen tabelwaarden. Hint: de eenheid van
+  de kolom. Naar .mcdx als tekst.
+- **Toleranties** (`uncertain.rs`): `Value::Unc` met per bron de bijdrage (`±` is `Expr::Call("plusminus", ..)`, BP
+  tussen vergelijken en optellen). Plus tot en met delen exact, machten en functies met centrale differenties op
+  1e-4·u (`lift`, aan de rand van het domein eenzijdig). Vergelijken, oplossers en grafieken gebruiken de nominale waarde.
+- **Functies**: `Jacob` (`eval/solve.rs`), `ellipK/E/F/Pi` (Carlson RF, RD, RC, RJ in `special.rs`, parameter m = k²),
+  `supsmooth` (Friedman, `fit.rs`).
+- **Documentatie op GitHub in het Engels**: `README.md` (Nederlands: `README.nl.md`), `CONTRIBUTING.md`,
+  `docs/INVENTORY.md`, `docs/ROADMAP.md`, release-notities. Dit bestand en de code blijven Nederlands.
+
+Open: gebieden en kop/voettekst in .mcdx. Daarvoor is een voorbeeldblad uit Mathcad Prime nodig; op de ontwikkelpc staat
+Mathcad niet (meer) en geen van de 11 bladen heeft zo'n element.
 
 **Nieuw in v1.8.** Uit de lijst in Notion ("Rekenblad"); de analyse van rb-gui (lint, venster, bibliotheek,
 update- en installatieroute) ging via Antigravity (agy, alleen lezen), het schrijven en testen hier.
@@ -383,7 +410,7 @@ numeriek differentiëren en integreren, complexe getallen, temperatuurschalen, w
 hoekdimensie onderzocht (blijft dimensieloos, zie §3), regio's met een 2D-positie. Daarnaast:
 `asinh`/`acosh`/`atanh`/`acoth`, `cot`/`sec`/`csc`/`coth`, `sign`, `Φ`, `δ`, `gcd`, `lcm`, `n!`,
 `combin`, `permut`, `mean`, `median`, `var`/`Var`, `stdev`/`Stdev`.
-Wat uit fase 1 doorschuift: programmeerblokken (`for`, `while`; staan in `INVENTARIS.md` bij fase 1) en
+Wat uit fase 1 doorschuift: programmeerblokken (`for`, `while`; staan in `INVENTORY.md` bij fase 1) en
 complexe matrices.
 
 **Fase 2 — functiebibliotheek en oplossers (L). Klaar in v0.3.** In deze volgorde gebouwd:
@@ -399,7 +426,7 @@ complexe matrices.
 5. oplossers (`root`, `nthroot`, solve blocks met `Given`/`Find`/`Minerr`/`Minimize`/`Maximize`);
 6. differentiaalvergelijkingen (`rkfixed`, `Rkadapt`, `odesolve`) en FFT (`fft`, `ifft`, `cfft`, `icfft`).
 
-Wat doorschuift: Design of Experiments, financiële functies en tekstfuncties (staan in `INVENTARIS.md`
+Wat doorschuift: Design of Experiments, financiële functies en tekstfuncties (staan in `INVENTORY.md`
 bij "fase 2+"), Airy-functies, stelsels en randwaardeproblemen in `odesolve`, `regress`/`loess`, een
 Given-blok in de REPL.
 
