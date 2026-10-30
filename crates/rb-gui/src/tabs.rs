@@ -224,7 +224,7 @@ impl App {
                 let round = egui::CornerRadius { nw: 7, ne: 7, sw: 0, se: 0 };
                 if on {
                     p.rect_filled(rect, round, canvas);
-                    p.hline(rect.left() + 6.0..=rect.right() - 6.0, rect.top() + 1.0, egui::Stroke::new(2.0, crate::icons::ACCENT));
+                    p.hline(rect.left() + 6.0..=rect.right() - 6.0, rect.top() + 1.0, egui::Stroke::new(2.0, crate::icons::accent()));
                 } else if hovered {
                     p.rect_filled(rect, round, ui.visuals().widgets.hovered.weak_bg_fill);
                 }

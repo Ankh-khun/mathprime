@@ -1309,7 +1309,7 @@ impl App {
             for (k2, grow) in [(1u8, 6.0f32), (2, 3.5), (3, 1.5)] {
                 painter.rect_filled(r.translate(Vec2::new(0.0, 2.0)).expand(grow), 4.0, Color32::from_black_alpha(shade * k2 / 2));
             }
-            painter.rect_filled(r, 2.0, tone(Color32::WHITE));
+            painter.rect_filled(r, 2.0, paper(dark));
             if r.intersects(ui.clip_rect()) && !self.cv.preview {
                 paint_background(&painter, self.cv.set.background, geo, k, self.cv.dark);
             }
@@ -1383,14 +1383,14 @@ impl App {
         // de oude weergave van de regio wegpoetsen
         if let Some((x, y, w, h)) = old {
             let r = Rect::from_min_size(geo.screen(x, y), Vec2::new(w, h) * geo.zoom);
-            painter.rect_filled(r.expand(2.0), 0.0, tone(Color32::WHITE));
+            painter.rect_filled(r.expand(2.0), 0.0, paper(dark));
         }
         match &e.mode {
             Mode::Math(ed) => {
                 let el = self.edit_layout(e, ed);
                 let b = &el.mbox;
                 let frame = Rect::from_min_size(origin, Vec2::new(b.width.max(6.0), b.ascent + b.descent) * geo.zoom).expand(3.0);
-                painter.rect_filled(frame, 2.0, tone(Color32::WHITE));
+                painter.rect_filled(frame, 2.0, paper(dark));
                 painter.rect_stroke(frame, 2.0, Stroke::new(1.0, tone(Color32::from_rgb(150, 170, 205))), StrokeKind::Middle);
                 let base = |dy: f32| origin.y + (b.ascent + dy) * geo.zoom;
                 if let Some((x0, x1, top, bottom)) = el.selection(ed) {
@@ -1440,7 +1440,7 @@ impl App {
                 let (mut add_row, mut add_col, mut del_col) = (false, false, false);
                 let rect = Rect::from_min_size(origin - Vec2::new(4.0, 3.0), Vec2::new(t.names.len() as f32 * 84.0 * geo.zoom + 140.0, 400.0));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                    egui::Frame::new().fill(tone(Color32::WHITE)).stroke(Stroke::new(1.0, tone(Color32::from_rgb(150, 170, 205)))).inner_margin(4.0).show(ui, |ui| {
+                    egui::Frame::new().fill(paper(dark)).stroke(Stroke::new(1.0, tone(Color32::from_rgb(150, 170, 205)))).inner_margin(4.0).show(ui, |ui| {
                         egui::Grid::new("tabel").spacing(Vec2::new(2.0, 2.0)).show(ui, |ui| {
                             let n = t.rows.len() + 2;
                             for r in 0..n {
@@ -1539,7 +1539,7 @@ impl App {
         // één stijl voor het hele programma: afgeronde hoeken, selectie in de accentkleur
         for theme in [egui::Theme::Light, egui::Theme::Dark] {
             ctx.style_mut_of(theme, |s| {
-                let accent = crate::icons::ACCENT;
+                let accent = crate::icons::accent();
                 s.visuals.selection.bg_fill = accent.gamma_multiply(if theme == egui::Theme::Dark { 0.55 } else { 0.25 });
                 s.visuals.selection.stroke = egui::Stroke::new(1.0, accent);
                 s.visuals.hyperlink_color = accent;
@@ -1552,6 +1552,19 @@ impl App {
                 s.spacing.menu_margin = egui::Margin::same(8);
                 // labels zijn geen tekstvak: geen I-cursor op het lint en in vensters
                 s.interaction.selectable_labels = false;
+                if let Some(p) = crate::theme::active() {
+                    p.apply(&mut s.visuals);
+                } else {
+                    s.visuals = if theme == egui::Theme::Dark { egui::Visuals::dark() } else { egui::Visuals::light() };
+                    s.visuals.selection.bg_fill = accent.gamma_multiply(if theme == egui::Theme::Dark { 0.55 } else { 0.25 });
+                    s.visuals.selection.stroke = egui::Stroke::new(1.0, accent);
+                    s.visuals.hyperlink_color = accent;
+                }
+                s.visuals.window_corner_radius = egui::CornerRadius::same(10);
+                s.visuals.menu_corner_radius = egui::CornerRadius::same(8);
+                for w in [&mut s.visuals.widgets.inactive, &mut s.visuals.widgets.hovered, &mut s.visuals.widgets.active, &mut s.visuals.widgets.open] {
+                    w.corner_radius = egui::CornerRadius::same(6);
+                }
             });
         }
     }
@@ -1676,6 +1689,9 @@ impl App {
             self.cv.set.english = crate::taal::system_english();
         }
         self.cv.dark = self.cv.set.thema == crate::settings::Thema::Donker;
+        if let Some(d) = self.keymap.path.as_ref().and_then(|p| p.parent()) {
+            self.own_themes = crate::theme::load_own(d);
+        }
         rb_units::set_significant_digits(self.cv.set.digits);
         crate::taal::set_english(self.cv.set.english);
         rb_units::i18n::set_english(self.cv.set.english);
@@ -1716,6 +1732,15 @@ impl App {
 }
 
 /// Raster, ruitjes of lijnen op pagina k, binnen de marges.
+/// De kleur van de pagina.
+fn paper(dark: bool) -> Color32 {
+    match crate::theme::active() {
+        Some(p) => p.paper(),
+        None if dark => paint::darken(Color32::WHITE),
+        None => Color32::WHITE,
+    }
+}
+
 fn paint_background(painter: &egui::Painter, bg: Background, geo: &Geo, k: usize, dark: bool) {
     let m = geo.grid.margin;
     let (x0, x1, y0, y1) = (m, geo.page_w - m, m, geo.page_h - m);

@@ -50,10 +50,15 @@ pub const OPEN: char = '\u{faf7}';
 pub const SAVE: char = '\u{eb62}';
 
 /// De accentkleur van het programma (tabbladen, selectie, actieve knoppen).
-pub const ACCENT: Color32 = Color32::from_rgb(37, 99, 235);
+pub fn accent() -> Color32 {
+    crate::theme::active().map_or(Color32::from_rgb(37, 99, 235), |p| p.accent)
+}
 
 /// De achtergrond rond de pagina's (ook de kleur van het actieve tabblad).
 pub fn canvas_bg(dark: bool) -> Color32 {
+    if let Some(p) = crate::theme::active() {
+        return p.bg;
+    }
     if dark { Color32::from_rgb(18, 19, 22) } else { Color32::from_rgb(235, 236, 240) }
 }
 
@@ -96,7 +101,7 @@ pub fn ribbon_button(ui: &mut Ui, big: &str, caption: &str, on: bool) -> Respons
     if ui.is_rect_visible(rect) {
         let v = ui.visuals();
         let fill = if on {
-            Some(ACCENT.gamma_multiply(0.16))
+            Some(accent().gamma_multiply(0.16))
         } else if resp.is_pointer_button_down_on() {
             Some(v.widgets.active.weak_bg_fill)
         } else if resp.hovered() {
@@ -140,7 +145,7 @@ pub fn underline_tab(ui: &mut Ui, label: &str, on: bool) -> Response {
     let resp = ui.add(egui::Label::new(text.size(14.0)).selectable(false).sense(Sense::click())).on_hover_cursor(egui::CursorIcon::PointingHand);
     let y = resp.rect.bottom() + 4.0;
     if on {
-        ui.painter().hline(resp.rect.left()..=resp.rect.right(), y, Stroke::new(2.0, ACCENT));
+        ui.painter().hline(resp.rect.left()..=resp.rect.right(), y, Stroke::new(2.0, accent()));
     } else if resp.hovered() {
         ui.painter().hline(resp.rect.left()..=resp.rect.right(), y, Stroke::new(1.0, ui.visuals().weak_text_color()));
     }

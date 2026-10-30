@@ -53,7 +53,16 @@ pub fn darken(c: Color32) -> Color32 {
 /// Teken `ops` met de oorsprong van de pagina op `origin` en vergroting `zoom`; `dark`: voor een
 /// donkere pagina.
 pub fn paint_ops(painter: &Painter, ops: &[Op], origin: Pos2, zoom: f32, dark: bool) {
-    let color = |c: Color| if dark { darken(color(c)) } else { color(c) };
+    let theme = crate::theme::active();
+    let color = |c: Color| {
+        // zwarte inkt krijgt de tekstkleur van het thema
+        if let Some(p) = theme {
+            if c.0 < 40 && c.1 < 40 && c.2 < 40 {
+                return p.fg;
+            }
+        }
+        if dark { darken(color(c)) } else { color(c) }
+    };
     let p = |x: f32, y: f32| origin + Vec2::new(x * zoom, y * zoom);
     for o in ops {
         match o {

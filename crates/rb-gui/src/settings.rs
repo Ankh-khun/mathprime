@@ -56,6 +56,10 @@ pub struct Settings {
     /// Wachten op het scherm bij het tekenen (vsync). Uit: het venster volgt de muis direct bij
     /// verplaatsen (met vsync bleef het op sommige systemen achter en gleed het na). Werkt na herstarten.
     pub vsync: bool,
+    /// De naam van het kleurthema (theme.rs); leeg: het gewone licht of donker.
+    pub kleuren: String,
+    /// De eigen titelbalk in plaats van die van Windows (titlebar.rs). Werkt na herstarten.
+    pub own_titlebar: bool,
 }
 
 impl Default for Settings {
@@ -70,6 +74,8 @@ impl Default for Settings {
             updates: true,
             english: false,
             vsync: false,
+            kleuren: String::new(),
+            own_titlebar: true,
         }
     }
 }
@@ -95,6 +101,8 @@ impl Settings {
                 "updates" => s.updates = v != "uit",
                 "taal" => s.english = v == "en",
                 "vsync" => s.vsync = v == "aan",
+                "kleuren" => s.kleuren = v.to_string(),
+                "titelbalk" => s.own_titlebar = v != "windows",
                 "zoom" => s.start_zoom = v.parse::<f32>().map_or(1.5, |z| z.clamp(0.6, 5.0)),
                 _ => {}
             }
@@ -104,7 +112,7 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         format!(
-            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\ntaal = {}\nvsync = {}\n",
+            "# Instellingen van MathPrime\nthema = {}\nachtergrond = {}\nstart = {}\naanvullen = {}\ncijfers = {}\nzoom = {}\nupdates = {}\ntaal = {}\nvsync = {}\nkleuren = {}\ntitelbalk = {}\n",
             self.thema.key(),
             self.background.key(),
             if self.start_welcome { "welkom" } else { "leeg" },
@@ -113,7 +121,9 @@ impl Settings {
             self.start_zoom,
             if self.updates { "aan" } else { "uit" },
             if self.english { "en" } else { "nl" },
-            if self.vsync { "aan" } else { "uit" }
+            if self.vsync { "aan" } else { "uit" },
+            self.kleuren,
+            if self.own_titlebar { "eigen" } else { "windows" }
         )
     }
 }
@@ -175,13 +185,107 @@ impl App {
     }
     /// Het thema toepassen; bij "zoals Windows" elke frame (Windows kan intussen wisselen).
     pub(crate) fn apply_theme(&mut self, ctx: &egui::Context) {
+        // tijdens het maken van een eigen thema geldt de opzet
+        if self.theme_draft.is_some() {
+            return;
+        }
+        let palette = crate::theme::find(&self.own_themes, &self.cv.set.kleuren);
+        let changed = palette != crate::theme::active();
+        crate::theme::set_active(palette);
         let dark = match self.cv.set.thema {
+            _ if palette.is_some() => palette.is_some_and(|p| p.is_dark()),
             Thema::Licht => false,
             Thema::Donker => true,
             Thema::Systeem => ctx.system_theme().map_or(self.cv.dark, |t| t == egui::Theme::Dark),
         };
-        if dark != self.cv.dark || ctx.theme() != if dark { egui::Theme::Dark } else { egui::Theme::Light } {
+        if changed || dark != self.cv.dark || ctx.theme() != if dark { egui::Theme::Dark } else { egui::Theme::Light } {
             self.set_dark(ctx, dark);
+        }
+    }
+
+    /// Het venster om een eigen thema te maken: elke kleur werkt meteen, Opslaan bewaart het in de instellingenmap.
+    pub(crate) fn theme_window(&mut self, ctx: &egui::Context) {
+        let Some(mut draft) = self.theme_draft.take() else { return };
+        let mut open = true;
+        let mut close = false;
+        let dir = self.keymap.path.as_ref().and_then(|p| p.parent()).map(|d| d.to_path_buf());
+        egui::Window::new(t("Eigen thema")).open(&mut open).collapsible(false).resizable(false).show(ctx, |ui| {
+            egui::Grid::new("thema-kleuren").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
+                ui.label(t("Naam"));
+                ui.text_edit_singleline(&mut draft.name);
+                ui.end_row();
+                let p = &mut draft.colors;
+                let rows: [(&str, &mut egui::Color32); 5] = [
+                    ("Achtergrond", &mut p.bg),
+                    ("Tekst", &mut p.fg),
+                    ("Paneel", &mut p.panel),
+                    ("Rand", &mut p.border),
+                    ("Accent", &mut p.accent),
+                ];
+                for (label, color) in rows {
+                    ui.label(t(label));
+                    ui.color_edit_button_srgba(color);
+                    ui.end_row();
+                }
+            });
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(t("Opslaan")).clicked() {
+                    if let Some(d) = &dir {
+                        let name = draft.name.trim().to_string();
+                        draft.name = if name.is_empty() { t("Mijn thema").to_string() } else { name };
+                        match crate::theme::save_own(d, &draft) {
+                            Ok(()) => {
+                                self.own_themes = crate::theme::load_own(d);
+                                self.cv.set.kleuren = draft.name.clone();
+                                self.save_settings();
+                                close = true;
+                            }
+                            Err(e) => self.status = format!("Kan {} niet opslaan: {e}", d.display()),
+                        }
+                    }
+                }
+                if ui.button(t("Exporteren…")).clicked() {
+                    if let Some(p) = rfd::FileDialog::new().set_file_name(format!("{}.txt", draft.name)).add_filter("MathPrime theme", &["txt"]).save_file() {
+                        self.status = match std::fs::write(&p, draft.to_text()) {
+                            Ok(()) => format!("Opgeslagen: {}", p.display()),
+                            Err(e) => format!("Kan {} niet opslaan: {e}", p.display()),
+                        };
+                    }
+                }
+                if ui.button(t("Importeren…")).clicked() {
+                    if let Some(p) = rfd::FileDialog::new().add_filter("MathPrime theme", &["txt"]).pick_file() {
+                        match std::fs::read_to_string(&p).ok().and_then(|text| crate::theme::Theme::parse(&text)) {
+                            Some(th) => draft = th,
+                            None => self.status = format!("{} is geen thema", p.display()),
+                        }
+                    }
+                }
+                let is_own = self.own_themes.iter().any(|o| o.name == draft.name);
+                if is_own && ui.button(t("Verwijderen")).clicked() {
+                    if let Some(d) = &dir {
+                        let _ = crate::theme::delete_own(d, &draft.name);
+                        self.own_themes = crate::theme::load_own(d);
+                        if self.cv.set.kleuren == draft.name {
+                            self.cv.set.kleuren.clear();
+                            self.save_settings();
+                        }
+                        close = true;
+                    }
+                }
+            });
+        });
+        if open && !close {
+            // meteen zien wat het wordt
+            if crate::theme::active() != Some(draft.colors) {
+                crate::theme::set_active(Some(draft.colors));
+                let dark = draft.colors.is_dark();
+                self.set_dark(ctx, dark);
+            }
+            self.theme_draft = Some(draft);
+        } else {
+            // terug naar wat er gekozen is
+            self.apply_theme(ctx);
         }
     }
 
@@ -219,6 +323,28 @@ impl App {
                     }
                 });
                 ui.end_row();
+                row_label(ui, "Kleuren");
+                ui.horizontal(|ui| {
+                    let shown = if s.kleuren.is_empty() { t("Standaard").to_string() } else { s.kleuren.clone() };
+                    egui::ComboBox::from_id_salt("kleuren").selected_text(shown).width(170.0).show_ui(ui, |ui| {
+                        ui.selectable_value(&mut s.kleuren, String::new(), t("Standaard"));
+                        for th in crate::theme::builtin() {
+                            ui.selectable_value(&mut s.kleuren, th.name.clone(), th.name);
+                        }
+                        if !self.own_themes.is_empty() {
+                            ui.separator();
+                        }
+                        for th in &self.own_themes {
+                            ui.selectable_value(&mut s.kleuren, th.name.clone(), th.name.as_str());
+                        }
+                    });
+                    if ui.button(t("Eigen thema…")).clicked() {
+                        let base = crate::theme::active().unwrap_or(crate::theme::builtin()[0].colors);
+                        let name = if s.kleuren.is_empty() { t("Mijn thema").to_string() } else { s.kleuren.clone() };
+                        self.theme_draft = Some(crate::theme::Theme { name, colors: base });
+                    }
+                });
+                ui.end_row();
                 row_label(ui, "Achtergrond");
                 ui.horizontal(|ui| {
                     for b in Background::ALL {
@@ -251,6 +377,9 @@ impl App {
                 ui.end_row();
                 row_label(ui, "Automatisch aanvullen");
                 ui.checkbox(&mut s.autocomplete, t("lijst met namen tijdens het typen"));
+                ui.end_row();
+                row_label(ui, "Titelbalk");
+                ui.checkbox(&mut s.own_titlebar, t("in de kleuren van het thema (na herstarten)"));
                 ui.end_row();
                 row_label(ui, "Vsync");
                 ui.checkbox(&mut s.vsync, t("wachten op het scherm (na herstarten)"))
@@ -285,7 +414,7 @@ impl App {
                 if let Some(text) = status {
                     ui.label("");
                     ui.vertical(|ui| {
-                        ui.label(RichText::new(text).color(crate::icons::ACCENT));
+                        ui.label(RichText::new(text).color(crate::icons::accent()));
                         if let Phase::Newer(u) = self.upd.phase.clone() {
                             ui.horizontal(|ui| {
                                 if u.setup.is_some() && ui.button(t("Downloaden en installeren")).on_hover_text(t("Open werk wordt eerst gevraagd op te slaan")).clicked() {
@@ -336,7 +465,7 @@ mod tests {
 
     #[test]
     fn lezen_en_schrijven() {
-        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false, english: true, vsync: true };
+        let s = Settings { thema: Thema::Systeem, background: Background::Lijnen, start_welcome: true, autocomplete: false, digits: 4, start_zoom: 2.25, updates: false, english: true, vsync: true, kleuren: "The Moon".into(), own_titlebar: false };
         assert_eq!(Settings::parse(&s.to_text()), s);
         // een oud bestand: alleen thema en achtergrond, de rest standaard
         let old = Settings::parse("# Instellingen van MathPrime\nachtergrond = ruitjes\nthema = donker\n");

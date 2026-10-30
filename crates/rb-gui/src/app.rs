@@ -78,6 +78,9 @@ pub struct App {
     /// Een nieuwere versie op GitHub (update.rs): eerst het antwoord van de achtergrondtaak, dan de melding.
     /// Zoeken naar en installeren van een nieuwere versie (update.rs).
     pub(crate) upd: crate::update::State,
+    /// De eigen kleurthema's, en het thema dat in het venster gemaakt wordt.
+    pub(crate) own_themes: Vec<crate::theme::Theme>,
+    pub(crate) theme_draft: Option<crate::theme::Theme>,
     /// Schermafdruk voor tests (MATHPRIME_SCREENSHOT).
     shot: Option<crate::shot::Shot>,
 }
@@ -125,6 +128,8 @@ impl App {
             find: None,
             last_autosave: Instant::now(),
             upd: Default::default(),
+            own_themes: Vec::new(),
+            theme_draft: None,
             shot: crate::shot::Shot::from_env(),
         };
         app.load_settings();
@@ -514,7 +519,7 @@ impl App {
                     self.insert(ctx, crate::canvas::Ins::Image);
                 }
             });
-            ui.menu_button(t("Help"), |ui| {
+            let help = ui.menu_button(t("Help"), |ui| {
                 for a in [Action::Help, Action::Sneltoetsen, Action::Welkomstblad] {
                     item(ui, &self.keymap, a, &mut chosen);
                 }
@@ -525,6 +530,8 @@ impl App {
                     ui.close();
                 }
             });
+            // waar de menu's ophouden: de rest van de titelbalk is de sleepbalk
+            ui.ctx().data_mut(|d| d.insert_temp(crate::titlebar::menu_end_id(), help.response.rect.right()));
         });
         if let Some(a) = chosen {
             self.run(ctx, a);
@@ -826,7 +833,17 @@ impl eframe::App for App {
             ctx.send_viewport_cmd(ViewportCommand::Title(title.clone()));
             self.title = title;
         }
-        egui::Panel::top("menu").show(ui, |ui| self.menu(ctx, ui));
+        if self.cv.set.own_titlebar && self.shot.is_none() {
+            crate::titlebar::resize_edges(ctx);
+        }
+        if self.cv.set.own_titlebar {
+            let title = self.title.clone();
+            egui::Panel::top("menu").frame(egui::Frame::new().fill(ui.visuals().panel_fill)).show(ui, |ui| {
+                crate::titlebar::show(ctx, ui, &title, |ui| self.menu(ctx, ui));
+            });
+        } else {
+            egui::Panel::top("menu").show(ui, |ui| self.menu(ctx, ui));
+        }
         egui::Panel::top("lint").show(ui, |ui| self.ribbon(ctx, ui));
         let tab_fill = ui.visuals().panel_fill;
         egui::Panel::top("tabbladen")
@@ -887,7 +904,7 @@ impl eframe::App for App {
                     }
                     if let Some(u) = self.upd.newer() {
                         ui.add_space(12.0);
-                        let text = RichText::new(format!("{}  {} {} {}", crate::icons::REFRESH, crate::taal::nl_en("Versie", "Version"), u.version, crate::taal::nl_en("is uit", "is out"))).color(crate::icons::ACCENT);
+                        let text = RichText::new(format!("{}  {} {} {}", crate::icons::REFRESH, crate::taal::nl_en("Versie", "Version"), u.version, crate::taal::nl_en("is uit", "is out"))).color(crate::icons::accent());
                         let r = ui.add(egui::Label::new(text).sense(egui::Sense::click()));
                         if r.on_hover_text(t("Bijwerken in Instellingen")).clicked() {
                             self.cv.show_settings = true;
@@ -915,9 +932,10 @@ impl eframe::App for App {
         self.dialogs(ctx);
         self.functions_window(ctx);
         self.settings_window(ctx);
+        self.theme_window(ctx);
         self.recovery_window(ctx);
         self.autosave(ctx);
-        if self.cv.set.thema == crate::settings::Thema::Systeem {
+        if self.cv.set.thema == crate::settings::Thema::Systeem || !self.cv.set.kleuren.is_empty() {
             self.apply_theme(ctx);
         }
         self.library_form(ctx);

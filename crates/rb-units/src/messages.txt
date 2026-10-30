@@ -574,3 +574,4 @@ de onzekerheid is hier niet te bepalen: de functie bestaat niet naast deze waard
 ± hoort tussen twee getallen, zoals 2 m ± 1 mm => ± belongs between two numbers, such as 2 m ± 1 mm
 unc werkt niet met een {} => unc does not work with a {}
 een waarde met ± kan (nog) geen element van een matrix zijn => a value with ± cannot be an element of a matrix (yet)
+{} is geen thema => {} is not a theme

@@ -18,6 +18,8 @@ mod tabs;
 mod shot;
 mod update;
 mod taal;
+mod theme;
+mod titlebar;
 
 fn main() -> eframe::Result {
     let file = std::env::args().nth(1).map(std::path::PathBuf::from);
@@ -32,12 +34,13 @@ fn main() -> eframe::Result {
             .with_inner_size([1300.0, 850.0])
             .with_min_inner_size([600.0, 400.0])
             .with_title("MathPrime")
+            .with_decorations(!saved_settings().own_titlebar)
             .with_icon(std::sync::Arc::new(eframe::egui::IconData {
                 rgba: include_bytes!("../assets/mathprime-128.rgba").to_vec(),
                 width: 128,
                 height: 128,
             })),
-        glow_options: eframe::egui_glow::GlowConfiguration { vsync: vsync_setting(), ..Default::default() },
+        glow_options: eframe::egui_glow::GlowConfiguration { vsync: saved_settings().vsync, ..Default::default() },
         ..Default::default()
     };
     let result = eframe::run_native("MathPrime", options, Box::new(|cc| Ok(Box::new(app::App::new(cc, file, inbox)))));
@@ -45,9 +48,10 @@ fn main() -> eframe::Result {
     result
 }
 
-/// Vsync uit instellingen.txt (standaard uit); nodig vóór het venster er is.
-fn vsync_setting() -> bool {
+/// De instellingen die nodig zijn vóór het venster er is (vsync, titelbalk).
+fn saved_settings() -> settings::Settings {
     keymap::config_dir()
         .and_then(|d| std::fs::read_to_string(d.join("instellingen.txt")).ok())
-        .is_some_and(|t| settings::Settings::parse(&t).vsync)
+        .map(|t| settings::Settings::parse(&t))
+        .unwrap_or_default()
 }
