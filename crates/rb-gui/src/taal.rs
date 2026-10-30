@@ -291,6 +291,7 @@ const VERTALING: &[(&str, &str)] = &[
     ("Zoeken naar updates…", "Check for updates…"),
     ("wachten op het scherm (na herstarten)", "wait for the display (after restart)"),
     // overig
+    ("Plus-minus: een waarde met onzekerheid, 2 m ± 1 mm", "Plus-minus: a value with an uncertainty, 2 m ± 1 mm"),
     ("Sleep om te draaien; dubbelklik zet de blik terug", "Drag to rotate; double-click resets the view"),
     ("Bij inlezen staat op die plek een grijze notitie; bij opslaan staat de regio in Mathcad als tekst.", "When reading, a grey note is placed there; when saving, the region is stored in Mathcad as text."),
     ("De tekst van het werkblad tonen of verbergen (Ctrl+Shift+B)", "Show or hide the text of the worksheet (Ctrl+Shift+B)"),

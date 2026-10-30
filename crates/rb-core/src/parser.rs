@@ -9,6 +9,8 @@ const BP_OR: (u8, u8) = (2, 3);
 const BP_AND: (u8, u8) = (4, 5);
 const BP_NOT: u8 = 6; // `not a < b` is not (a < b), maar `not a and b` is (not a) and b
 const BP_CMP: (u8, u8) = (7, 8);
+// `a + b ± c` is (a + b) ± c, en `x ± 1 + y` is (x ± 1) + y
+const BP_PLUSMINUS: (u8, u8) = (9, 11);
 const BP_ADD: (u8, u8) = (10, 11);
 const BP_MUL: (u8, u8) = (20, 21);
 // naast elkaar (`50 Ω`, `2 π`) bindt sterker dan * en /: `230 V / 50 Ω` is (230 V) / (50 Ω)
@@ -97,6 +99,15 @@ impl<'a> Parser<'a> {
         loop {
             let tok = self.peek().tok.clone();
             match tok {
+                Tok::PlusMinus => {
+                    if BP_PLUSMINUS.0 < min_bp {
+                        break;
+                    }
+                    self.advance();
+                    let rhs = self.parse_expr(BP_PLUSMINUS.1)?;
+                    lhs = Expr::Call("plusminus".to_string(), vec![lhs, rhs]);
+                    continue;
+                }
                 Tok::Field(name) => {
                     if BP_POSTFIX < min_bp {
                         break;

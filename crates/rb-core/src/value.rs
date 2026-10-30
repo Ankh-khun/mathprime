@@ -411,6 +411,8 @@ pub enum Value {
     Range(RangeVal),
     /// Tekst (`"abc"`), zoals een string in Mathcad.
     Str(String),
+    /// Een getal met een onzekerheid (`2 m ± 1 mm`).
+    Unc(crate::uncertain::Uncertain),
     /// Een opzoektabel, of één rij daarvan (`tabel("IPE")`, `IPE("IPE200")`).
     Table(std::sync::Arc<crate::tables::Table>),
 }
@@ -452,6 +454,7 @@ impl Value {
             Value::Range(_) => "bereik",
             Value::Str(_) => "tekst",
             Value::Table(_) => "tabel",
+            Value::Unc(_) => "getal met onzekerheid",
         }
     }
 
@@ -459,6 +462,7 @@ impl Value {
     pub fn has_nan(&self) -> bool {
         match self {
             Value::Num(q) => q.value.is_nan(),
+            Value::Unc(u) => u.value.is_nan(),
             Value::Complex(c) => c.re.is_nan() || c.im.is_nan(),
             Value::Matrix(m) => {
                 m.data.iter().any(|q| q.value.is_nan()) || m.im.as_ref().is_some_and(|im| im.iter().any(|v| v.is_nan()))
@@ -471,6 +475,7 @@ impl Value {
     pub fn is_finite(&self) -> bool {
         match self {
             Value::Num(q) => q.value.is_finite(),
+            Value::Unc(u) => u.value.is_finite(),
             Value::Complex(c) => c.re.is_finite() && c.im.is_finite(),
             Value::Matrix(m) => {
                 m.data.iter().all(|q| q.value.is_finite()) && m.im.as_ref().is_none_or(|im| im.iter().all(|v| v.is_finite()))
@@ -483,6 +488,8 @@ impl Value {
     pub fn as_quantity(&self, what: &str) -> Result<Quantity, Error> {
         match self {
             Value::Num(q) => Ok(*q),
+            // oplossers en grafieken rekenen met de nominale waarde
+            Value::Unc(u) => Ok(u.nominal()),
             Value::Range(_) => Err(range_err()),
             other => Err(dom(format!("{what} moet een reëel getal zijn, geen {}", other.kind()))),
         }
@@ -530,6 +537,7 @@ pub fn neg(v: &Value) -> Result<Value, Error> {
         Value::Range(_) => return Err(range_err()),
         Value::Str(_) => return Err(str_err()),
         Value::Table(_) => return Err(table_err()),
+        Value::Unc(u) => Value::Unc(u.scaled(-u.value, u.dim, -1.0)),
     })
 }
 
@@ -539,6 +547,9 @@ pub fn str_err() -> Error {
 }
 
 pub fn binop(op: BinOp, a: &Value, b: &Value) -> Result<Value, Error> {
+    if let Some(r) = crate::uncertain::binop(op, a, b) {
+        return r;
+    }
     if matches!(a, Value::Range(_)) || matches!(b, Value::Range(_)) {
         return Err(range_err());
     }
@@ -728,6 +739,10 @@ fn approx_eq_c(x: Complex, y: Complex) -> bool {
 /// Vergelijk twee waarden. `==` en `!=` gebruiken een relatieve tolerantie van 1e-12, zodat
 /// `0.1 + 0.2 == 0.3` waar is.
 pub fn compare(op: CmpOp, a: &Value, b: &Value) -> Result<bool, Error> {
+    // vergelijken gaat op de nominale waarde
+    if crate::uncertain::any(std::slice::from_ref(a)) || crate::uncertain::any(std::slice::from_ref(b)) {
+        return compare(op, &crate::uncertain::plain(a), &crate::uncertain::plain(b));
+    }
     let equality = matches!(op, CmpOp::Eq | CmpOp::Ne);
     let eq = match (a, b) {
         (Value::Range(_), _) | (_, Value::Range(_)) => return Err(range_err()),

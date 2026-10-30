@@ -928,6 +928,15 @@ fn norm(m: &Matrix) -> Result<Quantity, Error> {
 /// Roep een ingebouwde functie aan. `None` betekent: geen ingebouwde functie met deze naam.
 /// `origin` is de eerste index (ORIGIN, standaard 0).
 pub fn call(name: &str, a: &[Value], origin: i64) -> Option<Result<Value, Error>> {
+    if let Some(r) = crate::uncertain::call(name, a) {
+        return Some(r);
+    }
+    // een functie van een waarde met ±: de waarde uit de functie, de onzekerheid uit de afgeleide
+    if crate::uncertain::any(a) {
+        let noms: Vec<Value> = a.iter().map(crate::uncertain::plain).collect();
+        call(name, &noms, origin)?.ok()?;
+        return Some(crate::uncertain::lift(a, &mut |args: &[Value]| call(name, args, origin).expect("bekende functie")));
+    }
     if let Some(r) = crate::strings::call(name, a) {
         return Some(r);
     }
@@ -1006,6 +1015,8 @@ pub const NAMES: &[&str] = &[
     "concat", "strlen", "substr", "search", "str2num", "num2str", "str2vec", "vec2str", "IsString", "error",
     // bestanden (via het werkblad, zie rb-sheet/src/io.rs)
     "READCSV", "WRITECSV", "READEXCEL", "WRITEEXCEL", "READFILE", "WRITEFILE", "READPRN", "WRITEPRN",
+    // onzekerheid (zie uncertain.rs)
+    "plusminus", "nomval", "unc",
     // opzoektabellen (zie tables.rs)
     "tabel", "table",
     // speciale vormen (in de evaluator)

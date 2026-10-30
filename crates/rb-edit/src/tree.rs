@@ -32,6 +32,8 @@ pub enum Op {
     Factorial,
     /// `→` (symbolisch rekenen, Ctrl+.)
     Arrow,
+    /// `±` (een waarde met onzekerheid)
+    PlusMinus,
 }
 
 impl Op {
@@ -55,6 +57,7 @@ impl Op {
             Op::Assign => "←",
             Op::Factorial => "!",
             Op::Arrow => "→",
+            Op::PlusMinus => "±",
         }
     }
 }
@@ -564,6 +567,7 @@ impl Editor {
             }
             '>' if prev == Some(Atom::Op(Op::Lt)) => self.replace_prev(Atom::Op(Op::Ne)),
             '+' => self.op(Op::Plus),
+            '±' => self.op(Op::PlusMinus),
             '-' | '−' => self.op(Op::Minus),
             '*' => self.op(Op::Times),
             ',' => self.op(Op::Comma),

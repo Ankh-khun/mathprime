@@ -146,6 +146,7 @@ fn groups(tab: Tab) -> Vec<(&'static str, Vec<B>)> {
                     ("≤", "Kleiner of gelijk (Ctrl+9)", t(T::Op(Op::Le))),
                     ("≥", "Groter of gelijk (Ctrl+0)", t(T::Op(Op::Ge))),
                     ("≠", "Ongelijk (<>)", t(T::Op(Op::Ne))),
+                    ("±", "Plus-minus: een waarde met onzekerheid, 2 m ± 1 mm", t(T::Op(Op::PlusMinus))),
                 ],
             ),
             (
@@ -370,7 +371,7 @@ fn look(label: &str) -> Option<(String, String)> {
         "n!" => sym("Faculteit"),
         "( )" => sym("Haakjes"),
         "αβ" => sym("Grieks"),
-        "<" | ">" | "≤" | "≥" | "≠" => sym(""),
+        "<" | ">" | "≤" | "≥" | "≠" | "±" => sym(""),
         "∧ and" => Some(("∧".into(), "En".into())),
         "∨ or" => Some(("∨".into(), "Of".into())),
         "¬ not" => Some(("¬".into(), "Niet".into())),

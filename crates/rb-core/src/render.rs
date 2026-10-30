@@ -97,6 +97,20 @@ fn lookup_scale(unit: &str) -> Option<f64> {
 pub fn render_value(value: &Value, display: &Option<Display>) -> Result<String, Error> {
     match value {
         Value::Table(t) => Ok(table_text(t)),
+        Value::Unc(u) => {
+            let (div, unit) = match display {
+                Some(Display::Unit { unit, text }) => {
+                    format_in_unit(u.nominal(), *unit, text)?;
+                    (unit.value, text.clone())
+                }
+                Some(Display::Hint(h)) => match lookup_scale(h) {
+                    Some(f) if rb_units::lookup_unit(h).is_none_or(|(_, d)| d == u.dim) => (f, h.clone()),
+                    _ => auto_scale(u.value.abs().max(u.std()), u.dim),
+                },
+                _ => auto_scale(u.value.abs().max(u.std()), u.dim),
+            };
+            Ok(crate::uncertain::text(u, div, &unit))
+        }
         Value::Str(s) => match display {
             Some(Display::Unit { .. } | Display::Offset { .. }) => Err(Error::Domain("tekst heeft geen eenheid; laat het vakje achter '=' leeg".into())),
             _ => Ok(format!("\"{s}\"")),

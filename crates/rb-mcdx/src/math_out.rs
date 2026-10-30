@@ -180,9 +180,9 @@ fn args_xml(args: &[Expr], n: &Names) -> R {
 }
 
 fn call(f: &str, args: &[Expr], n: &Names) -> R {
-    // opzoektabellen kent Mathcad niet: de regio gaat als tekst mee
-    if matches!(f, "tabel" | "table") {
-        return Err("opzoektabel".to_string());
+    // opzoektabellen en onzekerheid kent Mathcad niet: de regio gaat als tekst mee
+    if matches!(f, "tabel" | "table" | "plusminus" | "nomval" | "unc") {
+        return Err("kent Mathcad niet".to_string());
     }
     let one = |op: &str| -> R {
         match args {

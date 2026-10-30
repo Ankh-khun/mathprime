@@ -18,6 +18,7 @@ pub mod solve;
 pub mod strings;
 pub mod symbolic;
 pub mod tables;
+pub mod uncertain;
 mod error;
 mod eval;
 pub mod finance;

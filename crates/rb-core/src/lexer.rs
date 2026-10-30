@@ -6,6 +6,8 @@ pub enum Tok {
     /// Imaginair getal: `2i`, `0.5j`
     Imag(f64),
     Ident(String),
+    /// `±`
+    PlusMinus,
     /// `.naam` na een haakje: `IPE("IPE200").Iy`
     Field(String),
     /// Tekst: `"abc"`
@@ -233,6 +235,7 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Error> {
             '+' => (Tok::Plus, 1),
             '-' if next == Some('>') => (Tok::Arrow, 2),
             '→' => (Tok::Arrow, 1),
+            '±' => (Tok::PlusMinus, 1),
             '-' | '−' => (Tok::Minus, 1),
             '*' | '×' | '·' => (Tok::Star, 1),
             '/' | '÷' => (Tok::Slash, 1),

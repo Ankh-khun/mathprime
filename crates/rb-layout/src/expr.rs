@@ -43,7 +43,7 @@ fn prec(e: &Expr) -> u8 {
 
 /// Een 'atoom' heeft nooit haakjes nodig als grondtal van een macht.
 fn is_atom(e: &Expr) -> bool {
-    matches!(e, Expr::Var(_) | Expr::Call(..) | Expr::Index(..) | Expr::Matrix(_) | Expr::Interp(..)) || (matches!(e, Expr::Num(_)) && prec(e) == 9)
+    !matches!(e, Expr::Call(f, _) if f == "plusminus") && matches!(e, Expr::Var(_) | Expr::Call(..) | Expr::Index(..) | Expr::Matrix(_) | Expr::Interp(..)) || (matches!(e, Expr::Num(_)) && prec(e) == 9)
 }
 
 /// Eindigt de weergave van `e` op een getal (zoals `F · 2`)?
@@ -129,6 +129,7 @@ impl L<'_> {
             ("nthroot" | "root", [x, n]) => radical(self.expr(x, size), Some(self.expr(n, script_size(size))), size),
             ("abs", [x]) => fence(self.expr(x, size), '|', size),
             ("factorial", [x]) => row(vec![self.paren_if(x, !is_atom(x), size), self.text("!", size)]),
+            ("plusminus", [a, b]) => row(vec![self.expr(a, size), self.op("±", size), self.expr(b, size)]),
             _ => row(vec![self.name(name, size), fence(self.list(args, size), '(', size)]),
         }
     }
@@ -364,6 +365,11 @@ pub fn value_box(m: &dyn Metrics, value: &Value, display: &Option<Display>, opts
     }
     if let Value::Table(t) = value {
         return text(m, &rb_core::table_text(t), size, Style::Result);
+    }
+    if matches!(value, Value::Unc(_)) {
+        if let Ok(s) = rb_core::render_value(value, display) {
+            return text(m, &s, size, Style::Result);
+        }
     }
     if let Ok(Some((num, unit))) = scalar_parts(value, display) {
         return with_unit(m, result_number(m, &num, size), &unit, size);

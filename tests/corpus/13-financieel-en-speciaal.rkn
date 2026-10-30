@@ -28,3 +28,9 @@ J[1, 0] =                                       // verwacht: 5
 " elliptische integralen (Abramowitz & Stegun, tabel 17.1)
 ellipK(0.5) =                                   // verwacht: 1.85407
 ellipE(0.5) =                                   // verwacht: 1.35064
+" onzekerheid: onafhankelijke bronnen kwadratisch, dezelfde bron niet
+L := 2 m ± 1 mm
+b := 300 mm ± 2 mm
+L * b =                                         // verwacht: (0.6000 ± 0.0040) m^2
+L - L =                                         // verwacht: 0 m
+L + L =                                         // verwacht: (4.0000 ± 0.0020) m

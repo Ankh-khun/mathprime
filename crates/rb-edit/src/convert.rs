@@ -42,6 +42,7 @@ fn op_text(op: Op, first: bool) -> &'static str {
         Op::Assign => " := ",
         Op::Factorial => "!",
         Op::Arrow => " → ",
+        Op::PlusMinus => " ± ",
     }
 }
 
@@ -218,6 +219,7 @@ fn prec(e: &Expr) -> u8 {
         Expr::Not(_) => 3,
         Expr::Cmp(..) => 4,
         Expr::Bin(BinOp::Add | BinOp::Sub, ..) => 5,
+        Expr::Call(f, _) if f == "plusminus" => 4,
         Expr::Bin(BinOp::Mul, ..) => 6,
         Expr::Neg(_) => 7,
         Expr::Bin(BinOp::Pow, ..) => 8,
@@ -322,6 +324,11 @@ impl Builder {
             }
             Expr::Call(name, args) => match (name.as_str(), args.as_slice()) {
                 ("sqrt", [x]) => out.push(Atom::Sqrt(self.block(x))),
+                ("plusminus", [a, b]) => {
+                    self.paren_if(a, prec(a) < 5, out);
+                    out.push(Atom::Op(Op::PlusMinus));
+                    self.paren_if(b, prec(b) < 5, out);
+                }
                 ("nthroot", [x, n]) => out.push(Atom::Root { index: self.block(n), radicand: self.block(x) }),
                 ("abs", [x]) => out.push(Atom::Abs(self.block(x))),
                 ("factorial", [x]) => {

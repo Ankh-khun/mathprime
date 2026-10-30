@@ -413,6 +413,11 @@ impl Env {
         };
         match self.eval(a, loc, depth)? {
             Value::Num(q) => Ok(Value::Num(to_kelvin(q)?)),
+            // `(20 ± 1) °C`: de onzekerheid schaalt mee, het nulpunt verschuift alleen de waarde
+            Value::Unc(u) => {
+                let k = to_kelvin(u.nominal())?;
+                Ok(Value::Unc(u.scaled(k.value, k.dim, factor)))
+            }
             Value::Matrix(m) => Ok(Value::Matrix(m.map(to_kelvin)?)),
             other => Err(dom(format!("een temperatuur kan geen {} zijn", other.kind()))),
         }
@@ -453,6 +458,7 @@ impl Env {
                             return Err(dom("tekst kan (nog) geen element van een matrix zijn"))
                         }
                         Value::Table(_) => return Err(value::table_err()),
+                        Value::Unc(_) => return Err(dom("een waarde met ± kan (nog) geen element van een matrix zijn")),
                     }
                 }
                 Ok(Value::Matrix(Matrix::from_complex(rows.len(), rows[0].len(), data)))
@@ -534,7 +540,7 @@ impl Env {
                     let items: Vec<Value> = match self.eval(iter, scope, depth)? {
                         Value::Range(r) => (0..r.n).map(|k| Value::Num(r.get(k))).collect(),
                         Value::Matrix(m) => m.elems().into_iter().map(Value::from).collect(),
-                        v @ (Value::Num(_) | Value::Complex(_) | Value::Table(_)) => vec![v],
+                        v @ (Value::Num(_) | Value::Complex(_) | Value::Table(_) | Value::Unc(_)) => vec![v],
                         // een tekst teken voor teken
                         Value::Str(s) => s.chars().map(|c| Value::Str(c.to_string())).collect(),
                     };
@@ -977,6 +983,7 @@ impl Env {
                 }
             }
             Expr::Bin(BinOp::Div, a, b) if is_pure_number(b) => self.hint_of(a),
+            Expr::Call(f, args) if f == "plusminus" && !args.is_empty() => self.hint_of(&args[0]).or_else(|| self.hint_of(&args[1])),
             // een waarde uit een opzoektabel: in de eenheid van de kolom
             Expr::Call(f, args) if matches!(args.last(), Some(Expr::Str(_))) && self.table_hint(f, args).is_some() => self.table_hint(f, args),
             Expr::Call(f, args) if !self.funcs.contains_key(f) => match f.as_str() {
