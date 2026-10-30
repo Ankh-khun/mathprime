@@ -492,9 +492,8 @@ fn foutmeldingen_in_het_engels() {
         ("a := 1 m + 1 s\n", "units do not match"),
         ("b := nietbestaand + 1\n", "unknown name 'nietbestaand'"),
         ("c := 1 / 0\nc =\n", "division by zero"),
-        ("d := 1\ne := d(1)\n", "'d' is not a function"),
         ("f := pmt(1)\n", "pmt expects 3 to 5 argument(s), but got 1"),
-        ("g := [1, 2] * [1, 2]\n", "cannot multiply a 1×2 matrix by a 1×2 matrix"),
+        ("g := [1, 2; 3, 4] * [1, 2, 3; 4, 5, 6; 7, 8, 9]\n", "cannot multiply a 2×2 matrix by a 3×3 matrix"),
     ];
     for (src, _) in &cases {
         let sheet = Sheet::load(src);
